@@ -4,7 +4,16 @@ internal class ComponentDepot
 {
 	private Dictionary<Type, ComponentStorage> storages = new Dictionary<Type, ComponentStorage>();
 
+	private Dictionary<FilterSignature, HashSet<int>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, HashSet<int>>();
+
+	private Dictionary<Type, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<Type, HashSet<FilterSignature>>();
+
 	private Dictionary<int, HashSet<Type>> entityComponentMap = new Dictionary<int, HashSet<Type>>();
+
+	private ComponentStorage Lookup(Type type)
+	{
+		return storages[type];
+	}
 
 	private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : struct
 	{
@@ -27,6 +36,11 @@ internal class ComponentDepot
 		return Lookup<TComponent>().Has(entityID);
 	}
 
+	private bool Has(Type type, int entityID)
+	{
+		return Lookup(type).Has(entityID);
+	}
+
 	public ref readonly TComponent Get<TComponent>(int entityID) where TComponent : struct
 	{
 		return ref Lookup<TComponent>().Get(entityID);
@@ -41,7 +55,19 @@ internal class ComponentDepot
 			entityComponentMap.Add(entityID, new HashSet<Type>());
 		}
 
-		entityComponentMap[entityID].Add(typeof(TComponent));
+		var alreadyExists = entityComponentMap[entityID].Add(typeof(TComponent));
+
+		// update filters
+		if (!alreadyExists)
+		{
+			if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
+			{
+				foreach (var filterSignature in filterSignatures)
+				{
+					CheckFilter(filterSignature, entityID);
+				}
+			}
+		}
 	}
 
 	public ReadOnlySpan<Entity> ReadEntities<TComponent>() where TComponent : struct
@@ -58,7 +84,19 @@ internal class ComponentDepot
 	{
 		Lookup<TComponent>().Remove(entityID);
 
-		entityComponentMap[entityID].Remove(typeof(TComponent));
+		var found = entityComponentMap[entityID].Remove(typeof(TComponent));
+
+		// update filters
+		if (found)
+		{
+			if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
+			{
+				foreach (var filterSignature in filterSignatures)
+				{
+					CheckFilter(filterSignature, entityID);
+				}
+			}
+		}
 	}
 
 	public void OnEntityDestroy(int entityID)
@@ -72,5 +110,64 @@ internal class ComponentDepot
 
 			entityComponentMap.Remove(entityID);
 		}
+	}
+
+	public Filter CreateFilter(HashSet<Type> included, HashSet<Type> excluded)
+	{
+		var filterSignature = new FilterSignature(included, excluded);
+		if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
+		{
+			filterSignatureToEntityIDs.Add(filterSignature, new HashSet<int>());
+
+			foreach (var type in included)
+			{
+				if (!typeToFilterSignatures.ContainsKey(type))
+				{
+					typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+				}
+
+				typeToFilterSignatures[type].Add(filterSignature);
+			}
+
+			foreach (var type in excluded)
+			{
+				if (!typeToFilterSignatures.ContainsKey(type))
+				{
+					typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+				}
+
+				typeToFilterSignatures[type].Add(filterSignature);
+			}
+		}
+		return new Filter(this, included, excluded);
+	}
+
+	public IEnumerable<Entity> FilterEntities(Filter filter)
+	{
+		foreach (var id in filterSignatureToEntityIDs[filter.Signature])
+		{
+			yield return new Entity(id);
+		}
+	}
+
+	private bool CheckFilter(FilterSignature filterSignature, int entityID)
+	{
+		foreach (var type in filterSignature.Included)
+		{
+			if (!Has(type, entityID))
+			{
+				return false;
+			}
+		}
+
+		foreach (var type in filterSignature.Excluded)
+		{
+			if (Has(type, entityID))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 }

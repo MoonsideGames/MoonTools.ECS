@@ -2,28 +2,29 @@
 
 public class World
 {
-	private readonly List<System> systems = new List<System>();
-	private readonly List<Renderer> renderers = new List<Renderer>();
+	private readonly List<System> Systems = new List<System>();
+	private readonly List<Renderer> Renderers = new List<Renderer>();
+	private readonly List<Filter> Filters = new List<Filter>();
 	private EntityStorage EntityStorage { get; } = new EntityStorage();
 	private ComponentDepot ComponentDepot { get; } = new ComponentDepot();
 
-	public void AddSystem(System system)
+	internal void AddSystem(System system)
 	{
 		system.RegisterEntityStorage(EntityStorage);
 		system.RegisterComponentDepot(ComponentDepot);
-		systems.Add(system);
+		Systems.Add(system);
 	}
 
-	public void AddRenderer(Renderer renderer)
+	internal void AddRenderer(Renderer renderer)
 	{
 		renderer.RegisterEntityStorage(EntityStorage);
 		renderer.RegisterComponentDepot(ComponentDepot);
-		renderers.Add(renderer);
+		Renderers.Add(renderer);
 	}
 
 	public void Update(TimeSpan delta)
 	{
-		foreach (var system in systems)
+		foreach (var system in Systems)
 		{
 			system.Update(delta);
 		}
@@ -31,7 +32,7 @@ public class World
 
 	public void Draw(TimeSpan delta)
 	{
-		foreach (var renderer in renderers)
+		foreach (var renderer in Renderers)
 		{
 			renderer.Draw(delta);
 		}

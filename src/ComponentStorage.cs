@@ -2,6 +2,7 @@
 
 internal abstract class ComponentStorage
 {
+	public abstract bool Has(int entityID);
 	public abstract void Remove(int entityID);
 }
 
@@ -18,7 +19,7 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 		return nextID > 0;
 	}
 
-	public bool Has(int entityID)
+	public override bool Has(int entityID)
 	{
 		return entityIDToStorageIndex.ContainsKey(entityID);
 	}

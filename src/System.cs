@@ -4,9 +4,19 @@ public abstract class System : EntityComponentReader
 {
 	public abstract void Update(TimeSpan delta);
 
+	public System(World world)
+	{
+		world.AddSystem(this);
+	}
+
 	protected Entity CreateEntity()
 	{
 		return EntityStorage.Create();
+	}
+
+	protected FilterBuilder CreateFilterBuilder()
+	{
+		return new FilterBuilder(ComponentDepot);
 	}
 
 	protected void Set<TComponent>(in Entity entity, in TComponent component) where TComponent : struct

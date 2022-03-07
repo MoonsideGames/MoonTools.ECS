@@ -10,7 +10,17 @@ public abstract class System : EntityComponentReader
 		MessageDepot = messageDepot;
 	}
 
+	public System(World world)
+	{
+		world.AddSystem(this);
+	}
+
 	public abstract void Update(TimeSpan delta);
+
+	public virtual void InitializeFilters()
+	{
+
+	}
 
 	protected Entity CreateEntity()
 	{

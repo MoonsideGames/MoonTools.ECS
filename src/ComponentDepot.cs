@@ -55,16 +55,19 @@ internal class ComponentDepot
 			entityComponentMap.Add(entityID, new HashSet<Type>());
 		}
 
-		var alreadyExists = entityComponentMap[entityID].Add(typeof(TComponent));
+		var notFound = entityComponentMap[entityID].Add(typeof(TComponent));
 
 		// update filters
-		if (!alreadyExists)
+		if (notFound)
 		{
 			if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
-					CheckFilter(filterSignature, entityID);
+					if (CheckFilter(filterSignature, entityID))
+					{
+						filterSignatureToEntityIDs[filterSignature].Add(entityID);
+					}
 				}
 			}
 		}
@@ -93,7 +96,10 @@ internal class ComponentDepot
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
-					CheckFilter(filterSignature, entityID);
+					if (!CheckFilter(filterSignature, entityID))
+					{
+						filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+					}
 				}
 			}
 		}

@@ -2,14 +2,20 @@
 
 public abstract class System : EntityComponentReader
 {
-	public abstract void Update(TimeSpan delta);
-
+	internal MessageDepot MessageDepot;
 	public FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
 
 	public System(World world)
 	{
 		world.AddSystem(this);
 	}
+
+	internal void RegisterMessageDepot(MessageDepot messageDepot)
+	{
+		MessageDepot = messageDepot;
+	}
+
+	public abstract void Update(TimeSpan delta);
 
 	protected Entity CreateEntity()
 	{
@@ -24,6 +30,16 @@ public abstract class System : EntityComponentReader
 	protected void Remove<TComponent>(in Entity entity) where TComponent : struct
 	{
 		ComponentDepot.Remove<TComponent>(entity.ID);
+	}
+
+	protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : struct
+	{
+		return MessageDepot.Read<TMessage>();
+	}
+
+	protected bool SomeMessage<TMessage>() where TMessage : struct
+	{
+		return MessageDepot.Some<TMessage>();
 	}
 
 	protected void Destroy(in Entity entity)

@@ -4,14 +4,15 @@ public class World
 {
 	private readonly List<System> Systems = new List<System>();
 	private readonly List<Renderer> Renderers = new List<Renderer>();
-	private readonly List<Filter> Filters = new List<Filter>();
 	private EntityStorage EntityStorage { get; } = new EntityStorage();
 	private ComponentDepot ComponentDepot { get; } = new ComponentDepot();
+	private MessageDepot MessageDepot { get; } = new MessageDepot();
 
 	internal void AddSystem(System system)
 	{
 		system.RegisterEntityStorage(EntityStorage);
 		system.RegisterComponentDepot(ComponentDepot);
+		system.RegisterMessageDepot(MessageDepot);
 		Systems.Add(system);
 	}
 

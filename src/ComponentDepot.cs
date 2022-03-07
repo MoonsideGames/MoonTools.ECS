@@ -10,6 +10,14 @@ internal class ComponentDepot
 
 	private Dictionary<int, HashSet<Type>> entityComponentMap = new Dictionary<int, HashSet<Type>>();
 
+	internal void Register<TComponent>() where TComponent : struct
+	{
+		if (!storages.ContainsKey(typeof(TComponent)))
+		{
+			storages.Add(typeof(TComponent), new ComponentStorage<TComponent>());
+		}
+	}
+
 	private ComponentStorage Lookup(Type type)
 	{
 		return storages[type];
@@ -18,11 +26,7 @@ internal class ComponentDepot
 	private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : struct
 	{
 		// TODO: is it possible to optimize this?
-		if (!storages.ContainsKey(typeof(TComponent)))
-		{
-			storages.Add(typeof(TComponent), new ComponentStorage<TComponent>());
-		}
-
+		Register<TComponent>();
 		return storages[typeof(TComponent)] as ComponentStorage<TComponent>;
 	}
 
@@ -64,10 +68,7 @@ internal class ComponentDepot
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
-					if (CheckFilter(filterSignature, entityID))
-					{
-						filterSignatureToEntityIDs[filterSignature].Add(entityID);
-					}
+					CheckFilter(filterSignature, entityID);
 				}
 			}
 		}
@@ -96,10 +97,7 @@ internal class ComponentDepot
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
-					if (!CheckFilter(filterSignature, entityID))
-					{
-						filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					}
+					CheckFilter(filterSignature, entityID);
 				}
 			}
 		}
@@ -175,13 +173,14 @@ internal class ComponentDepot
 		}
 	}
 
-	private bool CheckFilter(FilterSignature filterSignature, int entityID)
+	private void CheckFilter(FilterSignature filterSignature, int entityID)
 	{
 		foreach (var type in filterSignature.Included)
 		{
 			if (!Has(type, entityID))
 			{
-				return false;
+				filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+				return;
 			}
 		}
 
@@ -189,10 +188,11 @@ internal class ComponentDepot
 		{
 			if (Has(type, entityID))
 			{
-				return false;
+				filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+				return;
 			}
 		}
 
-		return true;
+		filterSignatureToEntityIDs[filterSignature].Add(entityID);
 	}
 }

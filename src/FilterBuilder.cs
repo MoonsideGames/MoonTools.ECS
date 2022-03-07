@@ -22,12 +22,14 @@ public struct FilterBuilder
 
 	public FilterBuilder Include<TComponent>() where TComponent : struct
 	{
+		ComponentDepot.Register<TComponent>();
 		Included.Add(typeof(TComponent));
 		return new FilterBuilder(ComponentDepot, Included, Excluded);
 	}
 
 	public FilterBuilder Exclude<TComponent>() where TComponent : struct
 	{
+		ComponentDepot.Register<TComponent>();
 		Excluded.Add(typeof(TComponent));
 		return new FilterBuilder(ComponentDepot, Included, Excluded);
 	}

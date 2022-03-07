@@ -80,6 +80,25 @@ internal class ComponentDepot
 		return Lookup<TComponent>().AllComponents();
 	}
 
+	private void Remove(Type type, int entityID)
+	{
+		Lookup(type).Remove(entityID);
+
+		var found = entityComponentMap[entityID].Remove(type);
+
+		// update filters
+		if (found)
+		{
+			if (typeToFilterSignatures.TryGetValue(type, out var filterSignatures))
+			{
+				foreach (var filterSignature in filterSignatures)
+				{
+					CheckFilter(filterSignature, entityID);
+				}
+			}
+		}
+	}
+
 	public void Remove<TComponent>(int entityID) where TComponent : struct
 	{
 		Lookup<TComponent>().Remove(entityID);
@@ -105,7 +124,7 @@ internal class ComponentDepot
 		{
 			foreach (var type in entityComponentMap[entityID])
 			{
-				storages[type].Remove(entityID);
+				Remove(type, entityID);
 			}
 
 			entityComponentMap.Remove(entityID);

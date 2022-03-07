@@ -29,6 +29,8 @@ public class World
 		{
 			system.Update(delta);
 		}
+
+		MessageDepot.Clear();
 	}
 
 	public void Draw(TimeSpan delta)

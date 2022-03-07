@@ -15,6 +15,7 @@ public abstract class EntityComponentReader
 		ComponentDepot = componentDepot;
 	}
 
+	// TODO: is this faster or slower than a single-component Filter?
 	protected ReadOnlySpan<Entity> ReadEntities<TComponent>() where TComponent : struct
 	{
 		return ComponentDepot.ReadEntities<TComponent>();

@@ -5,11 +5,6 @@ public abstract class System : EntityComponentReader
 	internal MessageDepot MessageDepot;
 	public FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
 
-	public System(World world)
-	{
-		world.AddSystem(this);
-	}
-
 	internal void RegisterMessageDepot(MessageDepot messageDepot)
 	{
 		MessageDepot = messageDepot;
@@ -40,6 +35,11 @@ public abstract class System : EntityComponentReader
 	protected bool SomeMessage<TMessage>() where TMessage : struct
 	{
 		return MessageDepot.Some<TMessage>();
+	}
+
+	protected void Send<TMessage>(in TMessage message) where TMessage : struct
+	{
+		MessageDepot.Add(message);
 	}
 
 	protected void Destroy(in Entity entity)

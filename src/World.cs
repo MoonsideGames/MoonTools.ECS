@@ -2,25 +2,25 @@
 
 public class World
 {
-	private readonly List<System> Systems = new List<System>();
-	private readonly List<Renderer> Renderers = new List<Renderer>();
-	private EntityStorage EntityStorage { get; } = new EntityStorage();
-	private ComponentDepot ComponentDepot { get; } = new ComponentDepot();
-	private MessageDepot MessageDepot { get; } = new MessageDepot();
+	private readonly List<System> Systems;
+	private readonly List<Renderer> Renderers;
+	private readonly EntityStorage EntityStorage;
+	private readonly ComponentDepot ComponentDepot;
+	private MessageDepot MessageDepot;
 
-	internal void AddSystem(System system)
+	internal World(
+		List<System> systems,
+		List<Renderer> renderers,
+		ComponentDepot componentDepot,
+		EntityStorage entityStorage,
+		MessageDepot messageDepot
+	)
 	{
-		system.RegisterEntityStorage(EntityStorage);
-		system.RegisterComponentDepot(ComponentDepot);
-		system.RegisterMessageDepot(MessageDepot);
-		Systems.Add(system);
-	}
-
-	internal void AddRenderer(Renderer renderer)
-	{
-		renderer.RegisterEntityStorage(EntityStorage);
-		renderer.RegisterComponentDepot(ComponentDepot);
-		Renderers.Add(renderer);
+		Systems = systems;
+		Renderers = renderers;
+		ComponentDepot = componentDepot;
+		EntityStorage = entityStorage;
+		MessageDepot = messageDepot;
 	}
 
 	public void Update(TimeSpan delta)

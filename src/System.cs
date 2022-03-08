@@ -3,7 +3,6 @@
 public abstract class System : EntityComponentReader
 {
 	internal MessageDepot MessageDepot;
-	public FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
 
 	internal void RegisterMessageDepot(MessageDepot messageDepot)
 	{

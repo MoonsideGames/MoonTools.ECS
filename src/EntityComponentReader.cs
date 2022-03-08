@@ -4,6 +4,7 @@ public abstract class EntityComponentReader
 {
 	internal EntityStorage EntityStorage;
 	internal ComponentDepot ComponentDepot;
+	protected FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
 
 	internal void RegisterEntityStorage(EntityStorage entityStorage)
 	{

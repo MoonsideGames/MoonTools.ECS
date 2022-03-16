@@ -24,9 +24,14 @@ internal class MessageDepot
 		return Lookup<TMessage>().Some();
 	}
 
-	public ReadOnlySpan<TMessage> Read<TMessage>() where TMessage : struct
+	public ReadOnlySpan<TMessage> ReadAll<TMessage>() where TMessage : struct
 	{
 		return Lookup<TMessage>().All();
+	}
+
+	public TMessage ReadFirst<TMessage>() where TMessage : struct
+	{
+		return Lookup<TMessage>().First();
 	}
 
 	public void Clear()

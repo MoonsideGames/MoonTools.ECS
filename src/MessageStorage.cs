@@ -38,6 +38,11 @@ internal class MessageStorage<TMessage> : MessageStorage where TMessage : struct
 		return new ReadOnlySpan<TMessage>(messages, 0, count);
 	}
 
+	public TMessage First()
+	{
+		return messages[0];
+	}
+
 	public override void Clear()
 	{
 		count = 0;

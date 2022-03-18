@@ -38,17 +38,32 @@ public abstract class System : EntityComponentReader
 
 	protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : struct
 	{
-		return MessageDepot.ReadAll<TMessage>();
+		return MessageDepot.All<TMessage>();
 	}
 
 	protected TMessage ReadMessage<TMessage>() where TMessage : struct
 	{
-		return MessageDepot.ReadFirst<TMessage>();
+		return MessageDepot.First<TMessage>();
 	}
 
 	protected bool SomeMessage<TMessage>() where TMessage : struct
 	{
 		return MessageDepot.Some<TMessage>();
+	}
+
+	protected IEnumerable<TMessage> ReadMessagesWithEntity<TMessage>(in Entity entity) where TMessage : struct, IHasEntity
+	{
+		return MessageDepot.WithEntity<TMessage>(entity.ID);
+	}
+
+	protected ref readonly TMessage ReadMessageWithEntity<TMessage>(in Entity entity) where TMessage : struct, IHasEntity
+	{
+		return ref MessageDepot.FirstWithEntity<TMessage>(entity.ID);
+	}
+
+	protected bool SomeMessageWithEntity<TMessage>(in Entity entity) where TMessage : struct, IHasEntity
+	{
+		return MessageDepot.SomeWithEntity<TMessage>(entity.ID);
 	}
 
 	protected void Send<TMessage>(in TMessage message) where TMessage : struct

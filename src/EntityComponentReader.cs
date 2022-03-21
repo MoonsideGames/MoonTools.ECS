@@ -37,8 +37,18 @@ public abstract class EntityComponentReader
 		return ComponentDepot.Some<TComponent>();
 	}
 
-	protected TComponent Get<TComponent>(in Entity entity) where TComponent : struct
+	protected ref readonly TComponent Get<TComponent>(in Entity entity) where TComponent : struct
 	{
-		return ComponentDepot.Get<TComponent>(entity.ID);
+		return ref ComponentDepot.Get<TComponent>(entity.ID);
+	}
+
+	protected ref readonly TComponent Get<TComponent>() where TComponent : struct
+	{
+		return ref ComponentDepot.Get<TComponent>();
+	}
+
+	protected ref readonly Entity GetEntity<TComponent>() where TComponent : struct
+	{
+		return ref ComponentDepot.GetEntity<TComponent>();
 	}
 }

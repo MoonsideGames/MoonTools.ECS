@@ -29,6 +29,17 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 		return ref components[entityIDToStorageIndex[entityID]];
 	}
 
+	public ref readonly TComponent Get()
+	{
+		#if DEBUG
+		if (nextID == 0)
+		{
+			throw new ArgumentOutOfRangeException("Component storage is empty!");
+		}
+		#endif
+		return ref components[0];
+	}
+
 	public void Set(int entityID, in TComponent component)
 	{
 		if (!entityIDToStorageIndex.ContainsKey(entityID))
@@ -86,5 +97,10 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 	public ReadOnlySpan<TComponent> AllComponents()
 	{
 		return new ReadOnlySpan<TComponent>(components, 0, nextID);
+	}
+
+	public ref readonly Entity FirstEntity()
+	{
+		return ref storageIndexToEntities[0];
 	}
 }

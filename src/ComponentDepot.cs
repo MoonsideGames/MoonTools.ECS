@@ -50,6 +50,11 @@ internal class ComponentDepot
 		return ref Lookup<TComponent>().Get(entityID);
 	}
 
+	public ref readonly TComponent Get<TComponent>() where TComponent : struct
+	{
+		return ref Lookup<TComponent>().Get();
+	}
+
 	public void Set<TComponent>(int entityID, in TComponent component) where TComponent : struct
 	{
 		Lookup<TComponent>().Set(entityID, component);
@@ -72,6 +77,11 @@ internal class ComponentDepot
 				}
 			}
 		}
+	}
+
+	public ref readonly Entity GetEntity<TComponent>() where TComponent : struct
+	{
+		return ref Lookup<TComponent>().FirstEntity();
 	}
 
 	public ReadOnlySpan<Entity> ReadEntities<TComponent>() where TComponent : struct

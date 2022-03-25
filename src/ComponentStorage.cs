@@ -4,6 +4,9 @@ internal abstract class ComponentStorage
 {
 	public abstract bool Has(int entityID);
 	public abstract void Remove(int entityID);
+	public abstract ReadOnlySpan<Entity> AllEntities();
+
+	public abstract object Debug_Get(int entityID);
 }
 
 internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : struct
@@ -27,6 +30,11 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 	public ref readonly TComponent Get(int entityID)
 	{
 		return ref components[entityIDToStorageIndex[entityID]];
+	}
+
+	public override object Debug_Get(int entityID)
+	{
+		return components[entityIDToStorageIndex[entityID]];
 	}
 
 	public ref readonly TComponent Get()
@@ -89,7 +97,7 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 		entityIDToStorageIndex.Clear();
 	}
 
-	public ReadOnlySpan<Entity> AllEntities()
+	public override ReadOnlySpan<Entity> AllEntities()
 	{
 		return new ReadOnlySpan<Entity>(storageIndexToEntities, 0, nextID);
 	}

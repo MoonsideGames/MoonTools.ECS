@@ -205,4 +205,33 @@ internal class ComponentDepot
 
 		filterSignatureToEntityIDs[filterSignature].Add(entityID);
 	}
+
+	// debug use only!
+
+	public IEnumerable<object> Debug_GetAllComponents(int entityID)
+	{
+		foreach (var (type, storage) in storages)
+		{
+			if (storage.Has(entityID))
+			{
+				yield return storage.Debug_Get(entityID);
+			}
+		}
+	}
+
+	public ReadOnlySpan<Entity> Debug_GetEntities(Type componentType)
+	{
+		return Lookup(componentType).AllEntities();
+	}
+
+	public IEnumerable<Type> Debug_SearchComponentType(string typeString)
+	{
+		foreach (var type in storages.Keys)
+		{
+			if (type.ToString().ToLower().Contains(typeString.ToLower()))
+			{
+				yield return type;
+			}
+		}
+	}
 }

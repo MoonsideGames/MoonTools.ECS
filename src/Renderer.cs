@@ -6,6 +6,4 @@ public abstract class Renderer : EntityComponentReader
 	{
 		world.AddRenderer(this);
 	}
-
-	public abstract void Draw(TimeSpan delta);
 }

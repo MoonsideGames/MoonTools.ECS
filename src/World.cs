@@ -3,7 +3,6 @@
 public class World
 {
 	private readonly List<System> Systems = new List<System>();
-	private readonly List<Renderer> Renderers = new List<Renderer>();
 	private readonly EntityStorage EntityStorage = new EntityStorage();
 	private readonly ComponentDepot ComponentDepot = new ComponentDepot();
 	private MessageDepot MessageDepot = new MessageDepot();
@@ -20,7 +19,6 @@ public class World
 	{
 		renderer.RegisterEntityStorage(EntityStorage);
 		renderer.RegisterComponentDepot(ComponentDepot);
-		Renderers.Add(renderer);
 	}
 
 	public Entity CreateEntity()
@@ -46,13 +44,5 @@ public class World
 		}
 
 		MessageDepot.Clear();
-	}
-
-	public void Draw(TimeSpan delta)
-	{
-		foreach (var renderer in Renderers)
-		{
-			renderer.Draw(delta);
-		}
 	}
 }

@@ -2,7 +2,6 @@
 
 public class World
 {
-	private readonly List<System> Systems = new List<System>();
 	private readonly EntityStorage EntityStorage = new EntityStorage();
 	private readonly ComponentDepot ComponentDepot = new ComponentDepot();
 	private MessageDepot MessageDepot = new MessageDepot();
@@ -12,7 +11,6 @@ public class World
 		system.RegisterEntityStorage(EntityStorage);
 		system.RegisterComponentDepot(ComponentDepot);
 		system.RegisterMessageDepot(MessageDepot);
-		Systems.Add(system);
 	}
 
 	internal void AddRenderer(Renderer renderer)
@@ -36,13 +34,8 @@ public class World
 		MessageDepot.Add(message);
 	}
 
-	public void Update(TimeSpan delta)
+	public void FinishUpdate()
 	{
-		foreach (var system in Systems)
-		{
-			system.Update(delta);
-		}
-
 		MessageDepot.Clear();
 	}
 }

@@ -175,6 +175,7 @@ internal class ComponentDepot
 		return new Filter(this, included, excluded);
 	}
 
+	// FIXME: this dictionary should probably just store entities
 	public IEnumerable<Entity> FilterEntities(Filter filter)
 	{
 		foreach (var id in filterSignatureToEntityIDs[filter.Signature])

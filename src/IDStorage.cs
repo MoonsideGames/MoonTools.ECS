@@ -20,6 +20,11 @@ internal class IDStorage
 		}
 	}
 
+	public bool Taken(int id)
+	{
+		return !availableIDs.Contains(id) && id < nextID;
+	}
+
 	public void Release(int id)
 	{
 		availableIDs.Push(id);

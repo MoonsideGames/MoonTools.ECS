@@ -51,4 +51,9 @@ public abstract class EntityComponentReader
 	{
 		return ref ComponentDepot.GetEntity<TComponent>();
 	}
+
+	protected bool Exists(in Entity entity)
+	{
+		return EntityStorage.Exists(entity);
+	}
 }

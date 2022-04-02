@@ -4,7 +4,7 @@ internal class ComponentDepot
 {
 	private Dictionary<Type, ComponentStorage> storages = new Dictionary<Type, ComponentStorage>();
 
-	private Dictionary<FilterSignature, HashSet<int>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, HashSet<int>>();
+	private Dictionary<FilterSignature, IndexableSet<int>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<int>>();
 
 	private Dictionary<Type, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<Type, HashSet<FilterSignature>>();
 
@@ -150,7 +150,7 @@ internal class ComponentDepot
 		var filterSignature = new FilterSignature(included, excluded);
 		if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
 		{
-			filterSignatureToEntityIDs.Add(filterSignature, new HashSet<int>());
+			filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<int>());
 
 			foreach (var type in included)
 			{
@@ -182,6 +182,25 @@ internal class ComponentDepot
 		{
 			yield return new Entity(id);
 		}
+	}
+
+	public IEnumerable<Entity> FilterEntitiesRandom(Filter filter)
+	{
+		foreach (var index in RandomGenerator.LinearCongruentialGenerator(FilterCount(filter)))
+		{
+			yield return new Entity(filterSignatureToEntityIDs[filter.Signature][index]);
+		}
+	}
+
+	public Entity FilterRandomEntity(Filter filter)
+	{
+		var randomIndex = RandomGenerator.Next(FilterCount(filter));
+		return new Entity(filterSignatureToEntityIDs[filter.Signature][randomIndex]);
+	}
+
+	public int FilterCount(Filter filter)
+	{
+		return filterSignatureToEntityIDs[filter.Signature].Count;
 	}
 
 	private void CheckFilter(FilterSignature filterSignature, int entityID)

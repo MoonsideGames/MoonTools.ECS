@@ -9,6 +9,7 @@ internal abstract class ComponentStorage
 	public abstract object Debug_Get(int entityID);
 }
 
+// FIXME: we can probably get rid of this weird entity storage system by using filters
 internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : struct
 {
 	private int nextID;

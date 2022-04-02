@@ -12,4 +12,9 @@ public class Filter
 	}
 
 	public IEnumerable<Entity> Entities => ComponentDepot.FilterEntities(this);
+	public IEnumerable<Entity> EntitiesInRandomOrder => ComponentDepot.FilterEntitiesRandom(this);
+	public Entity RandomEntity => ComponentDepot.FilterRandomEntity(this);
+
+	public int Count => ComponentDepot.FilterCount(this);
+	public bool Empty => Count == 0;
 }

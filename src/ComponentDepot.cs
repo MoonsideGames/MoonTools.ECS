@@ -10,11 +10,18 @@ internal class ComponentDepot
 
 	private Dictionary<int, HashSet<Type>> entityComponentMap = new Dictionary<int, HashSet<Type>>();
 
+	#if DEBUG
+	private Dictionary<Type, Filter> singleComponentFilters = new Dictionary<Type, Filter>();
+	#endif
+
 	internal void Register<TComponent>() where TComponent : struct
 	{
 		if (!storages.ContainsKey(typeof(TComponent)))
 		{
 			storages.Add(typeof(TComponent), new ComponentStorage<TComponent>());
+			#if DEBUG
+			singleComponentFilters.Add(typeof(TComponent), CreateFilter(new HashSet<Type>() { typeof(TComponent) }, new HashSet<Type>()));
+			#endif
 		}
 	}
 
@@ -79,14 +86,9 @@ internal class ComponentDepot
 		}
 	}
 
-	public ref readonly Entity GetEntity<TComponent>() where TComponent : struct
+	public Entity GetSingletonEntity<TComponent>() where TComponent : struct
 	{
-		return ref Lookup<TComponent>().FirstEntity();
-	}
-
-	public ReadOnlySpan<Entity> ReadEntities<TComponent>() where TComponent : struct
-	{
-		return Lookup<TComponent>().AllEntities();
+		return Lookup<TComponent>().FirstEntity();
 	}
 
 	public ReadOnlySpan<TComponent> ReadComponents<TComponent>() where TComponent : struct
@@ -226,8 +228,7 @@ internal class ComponentDepot
 		filterSignatureToEntityIDs[filterSignature].Add(entityID);
 	}
 
-	// debug use only!
-
+	#if DEBUG
 	public IEnumerable<object> Debug_GetAllComponents(int entityID)
 	{
 		foreach (var (type, storage) in storages)
@@ -239,9 +240,9 @@ internal class ComponentDepot
 		}
 	}
 
-	public ReadOnlySpan<Entity> Debug_GetEntities(Type componentType)
+	public IEnumerable<Entity> Debug_GetEntities(Type componentType)
 	{
-		return Lookup(componentType).AllEntities();
+		return singleComponentFilters[componentType].Entities;
 	}
 
 	public IEnumerable<Type> Debug_SearchComponentType(string typeString)
@@ -254,4 +255,5 @@ internal class ComponentDepot
 			}
 		}
 	}
+	#endif
 }

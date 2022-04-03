@@ -4,8 +4,6 @@ internal abstract class ComponentStorage
 {
 	public abstract bool Has(int entityID);
 	public abstract void Remove(int entityID);
-	public abstract ReadOnlySpan<Entity> AllEntities();
-
 	public abstract object Debug_Get(int entityID);
 }
 
@@ -13,10 +11,9 @@ internal abstract class ComponentStorage
 internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : struct
 {
 	private int nextID;
-	private IDStorage idStorage = new IDStorage();
-	private readonly Dictionary<int, int> entityIDToStorageIndex = new Dictionary<int, int>();
-	private Entity[] storageIndexToEntities = new Entity[64];
-	private TComponent[] components = new TComponent[64];
+	private readonly Dictionary<int, int> entityIDToStorageIndex = new Dictionary<int, int>(16);
+	private int[] entityIDs = new int[16];
+	private TComponent[] components = new TComponent[16];
 
 	public bool Any()
 	{
@@ -59,11 +56,11 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 			if (index >= components.Length)
 			{
 				Array.Resize(ref components, components.Length * 2);
-				Array.Resize(ref storageIndexToEntities, storageIndexToEntities.Length * 2);
+				Array.Resize(ref entityIDs, entityIDs.Length * 2);
 			}
 
 			entityIDToStorageIndex[entityID] = index;
-			storageIndexToEntities[index] = new Entity(entityID);
+			entityIDs[index] = entityID;
 		}
 
 		components[entityIDToStorageIndex[entityID]] = component;
@@ -79,13 +76,12 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 			var lastElementIndex = nextID - 1;
 
 			// move a component into the hole to maintain contiguous memory
-			if (entityIDToStorageIndex.Count > 0 && storageIndex != lastElementIndex)
+			if (lastElementIndex != storageIndex)
 			{
-				var lastEntity = storageIndexToEntities[lastElementIndex];
-
-				entityIDToStorageIndex[lastEntity.ID] = storageIndex;
-				storageIndexToEntities[storageIndex] = lastEntity;
+				var lastEntityID = entityIDs[lastElementIndex];
+				entityIDToStorageIndex[lastEntityID] = storageIndex;
 				components[storageIndex] = components[lastElementIndex];
+				entityIDs[storageIndex] = lastEntityID;
 			}
 
 			nextID -= 1;
@@ -98,18 +94,13 @@ internal class ComponentStorage<TComponent> : ComponentStorage where TComponent 
 		entityIDToStorageIndex.Clear();
 	}
 
-	public override ReadOnlySpan<Entity> AllEntities()
-	{
-		return new ReadOnlySpan<Entity>(storageIndexToEntities, 0, nextID);
-	}
-
 	public ReadOnlySpan<TComponent> AllComponents()
 	{
 		return new ReadOnlySpan<TComponent>(components, 0, nextID);
 	}
 
-	public ref readonly Entity FirstEntity()
+	public Entity FirstEntity()
 	{
-		return ref storageIndexToEntities[0];
+		return new Entity(entityIDs[0]);
 	}
 }

@@ -1,5 +1,7 @@
 // NOTE: these methods are very inefficient
 // this class should only be used in debugging contexts!!
+
+#if DEBUG
 namespace MoonTools.ECS
 {
 	public abstract class DebugSystem : System
@@ -13,7 +15,7 @@ namespace MoonTools.ECS
 			return ComponentDepot.Debug_GetAllComponents(entity.ID);
 		}
 
-		protected ReadOnlySpan<Entity> Debug_GetEntities(Type componentType)
+		protected IEnumerable<Entity> Debug_GetEntities(Type componentType)
 		{
 			return ComponentDepot.Debug_GetEntities(componentType);
 		}
@@ -24,3 +26,4 @@ namespace MoonTools.ECS
 		}
 	}
 }
+#endif

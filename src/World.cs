@@ -1,22 +1,30 @@
-﻿namespace MoonTools.ECS;
+namespace MoonTools.ECS;
 
 public class World
 {
 	private readonly EntityStorage EntityStorage = new EntityStorage();
 	private readonly ComponentDepot ComponentDepot = new ComponentDepot();
-	private MessageDepot MessageDepot = new MessageDepot();
+	private readonly MessageDepot MessageDepot = new MessageDepot();
+	private readonly RelationDepot RelationDepot = new RelationDepot();
 
 	internal void AddSystem(System system)
 	{
 		system.RegisterEntityStorage(EntityStorage);
 		system.RegisterComponentDepot(ComponentDepot);
 		system.RegisterMessageDepot(MessageDepot);
+		system.RegisterRelationDepot(RelationDepot);
 	}
 
 	internal void AddRenderer(Renderer renderer)
 	{
 		renderer.RegisterEntityStorage(EntityStorage);
 		renderer.RegisterComponentDepot(ComponentDepot);
+		renderer.RegisterRelationDepot(RelationDepot);
+	}
+
+	public void AddRelationKind<TRelationKind>()
+	{
+		RelationDepot.Register<TRelationKind>();
 	}
 
 	public Entity CreateEntity()

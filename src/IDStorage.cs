@@ -5,12 +5,15 @@ internal class IDStorage
 	private int nextID = 0;
 
 	private readonly Stack<int> availableIDs = new Stack<int>();
+	private readonly HashSet<int> availableIDHash = new HashSet<int>();
 
 	public int NextID()
 	{
 		if (availableIDs.Count > 0)
 		{
-			return availableIDs.Pop();
+			var id = availableIDs.Pop();
+			availableIDHash.Remove(id);
+			return id;
 		}
 		else
 		{
@@ -22,11 +25,12 @@ internal class IDStorage
 
 	public bool Taken(int id)
 	{
-		return !availableIDs.Contains(id) && id < nextID;
+		return !availableIDHash.Contains(id) && id < nextID;
 	}
 
 	public void Release(int id)
 	{
 		availableIDs.Push(id);
+		availableIDHash.Add(id);
 	}
 }

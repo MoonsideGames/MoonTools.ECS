@@ -16,11 +16,6 @@ public abstract class System : EntityComponentReader
 
 	public abstract void Update(TimeSpan delta);
 
-	public virtual void InitializeFilters()
-	{
-
-	}
-
 	protected Entity CreateEntity()
 	{
 		return EntityStorage.Create();
@@ -28,6 +23,13 @@ public abstract class System : EntityComponentReader
 
 	protected void Set<TComponent>(in Entity entity, in TComponent component) where TComponent : struct
 	{
+		#if DEBUG
+		// check for use after destroy
+		if (!Exists(entity))
+		{
+			throw new ArgumentException("This entity is not valid!");
+		}
+		#endif
 		ComponentDepot.Set<TComponent>(entity.ID, component);
 	}
 

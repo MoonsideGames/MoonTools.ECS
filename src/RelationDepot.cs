@@ -37,6 +37,11 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().All();
 		}
 
+		public bool Related<TRelationKind>(int idA, int idB)
+		{
+			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
+		}
+
 		public IEnumerable<Entity> RelatedToA<TRelationKind>(int entityID)
 		{
 			return Lookup<TRelationKind>().RelatedToA(entityID);

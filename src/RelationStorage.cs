@@ -18,6 +18,7 @@ namespace MoonTools.ECS
 		public void Add(Relation relation)
 		{
 			if (relations.Contains(relation)) { return; }
+
 			var idA = relation.A.ID;
 			var idB = relation.B.ID;
 
@@ -34,6 +35,11 @@ namespace MoonTools.ECS
 			entitiesRelatedToB[idB].Add(idA);
 
 			relations.Add(relation);
+		}
+
+		public bool Has(Relation relation)
+		{
+			return relations.Contains(relation);
 		}
 
 		public IEnumerable<Entity> RelatedToA(int entityID)

@@ -62,6 +62,11 @@ public abstract class EntityComponentReader
 		return RelationDepot.Relations<TRelationKind>();
 	}
 
+	protected bool Related<TRelationKind>(in Entity a, in Entity b)
+	{
+		return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
+	}
+
 	protected IEnumerable<Entity> RelatedToA<TRelationKind>(in Entity entity)
 	{
 		return RelationDepot.RelatedToA<TRelationKind>(entity.ID);

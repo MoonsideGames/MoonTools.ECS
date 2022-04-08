@@ -1,3 +1,5 @@
+﻿using System.Collections.Generic;
+
 namespace MoonTools.ECS
 {
 	internal class RelationStorage

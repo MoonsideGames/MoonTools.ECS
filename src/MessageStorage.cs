@@ -1,87 +1,91 @@
-namespace MoonTools.ECS;
+﻿using System;
+using System.Collections.Generic;
 
-internal abstract class MessageStorage
+namespace MoonTools.ECS
 {
-	public abstract void Clear();
-}
-
-internal class MessageStorage<TMessage> : MessageStorage where TMessage : struct
-{
-	private int count = 0;
-	private int capacity = 128;
-	private TMessage[] messages;
-	private Dictionary<int, List<int>> entityToIndices = new Dictionary<int, List<int>>();
-
-	public MessageStorage()
+	internal abstract class MessageStorage
 	{
-		messages = new TMessage[capacity];
+		public abstract void Clear();
 	}
 
-	public void Add(in TMessage message)
+	internal class MessageStorage<TMessage> : MessageStorage where TMessage : struct
 	{
-		if (count == capacity)
+		private int count = 0;
+		private int capacity = 128;
+		private TMessage[] messages;
+		private Dictionary<int, List<int>> entityToIndices = new Dictionary<int, List<int>>();
+
+		public MessageStorage()
 		{
-			capacity *= 2;
-			Array.Resize(ref messages, capacity);
+			messages = new TMessage[capacity];
 		}
 
-		messages[count] = message;
-
-		if (message is IHasEntity entityMessage)
+		public void Add(in TMessage message)
 		{
-			if (!entityToIndices.ContainsKey(entityMessage.Entity.ID))
+			if (count == capacity)
 			{
-				entityToIndices.Add(entityMessage.Entity.ID, new List<int>());
+				capacity *= 2;
+				Array.Resize(ref messages, capacity);
 			}
 
-			entityToIndices[entityMessage.Entity.ID].Add(count);
+			messages[count] = message;
+
+			if (message is IHasEntity entityMessage)
+			{
+				if (!entityToIndices.ContainsKey(entityMessage.Entity.ID))
+				{
+					entityToIndices.Add(entityMessage.Entity.ID, new List<int>());
+				}
+
+				entityToIndices[entityMessage.Entity.ID].Add(count);
+			}
+
+			count += 1;
 		}
 
-		count += 1;
-	}
-
-	public bool Some()
-	{
-		return count > 0;
-	}
-
-	public ReadOnlySpan<TMessage> All()
-	{
-		return new ReadOnlySpan<TMessage>(messages, 0, count);
-	}
-
-	public TMessage First()
-	{
-		return messages[0];
-	}
-
-	public IEnumerable<TMessage> WithEntity(int entityID)
-	{
-		if (entityToIndices.ContainsKey(entityID))
+		public bool Some()
 		{
-			foreach (var index in entityToIndices[entityID])
+			return count > 0;
+		}
+
+		public ReadOnlySpan<TMessage> All()
+		{
+			return new ReadOnlySpan<TMessage>(messages, 0, count);
+		}
+
+		public TMessage First()
+		{
+			return messages[0];
+		}
+
+		public IEnumerable<TMessage> WithEntity(int entityID)
+		{
+			if (entityToIndices.ContainsKey(entityID))
 			{
-				yield return messages[index];
+				foreach (var index in entityToIndices[entityID])
+				{
+					yield return messages[index];
+				}
 			}
 		}
-	}
 
-	public ref readonly TMessage FirstWithEntity(int entityID)
-	{
-		return ref messages[entityToIndices[entityID][0]];
-	}
-
-	public bool SomeWithEntity(int entityID)
-	{
-		return entityToIndices.ContainsKey(entityID) && entityToIndices[entityID].Count > 0;
-	}
-
-	public override void Clear()
-	{
-		count = 0;
-		foreach (var set in entityToIndices.Values)
+		public ref readonly TMessage FirstWithEntity(int entityID)
 		{
-			set.Clear();
+			return ref messages[entityToIndices[entityID][0]];
+		}
+
+		public bool SomeWithEntity(int entityID)
+		{
+			return entityToIndices.ContainsKey(entityID) && entityToIndices[entityID].Count > 0;
+		}
+
+		public override void Clear()
+		{
+			count = 0;
+			foreach (var set in entityToIndices.Values)
+			{
+				set.Clear();
+			}
 		}
 	}
 }

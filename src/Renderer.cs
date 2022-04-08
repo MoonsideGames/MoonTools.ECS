@@ -1,9 +1,10 @@
-﻿namespace MoonTools.ECS;
-
-public abstract class Renderer : EntityComponentReader
+﻿namespace MoonTools.ECS
 {
-	public Renderer(World world)
+	public abstract class Renderer : EntityComponentReader
 	{
-		world.AddRenderer(this);
+		public Renderer(World world)
+		{
+			world.AddRenderer(this);
+		}
 	}
 }

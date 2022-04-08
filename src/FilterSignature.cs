@@ -1,47 +1,51 @@
-namespace MoonTools.ECS;
+﻿using System;
+using System.Collections.Generic;
 
-public struct FilterSignature
+namespace MoonTools.ECS
 {
-	private const int HASH_FACTOR = 97;
-
-	public HashSet<Type> Included;
-	public HashSet<Type> Excluded;
-
-	public FilterSignature(HashSet<Type> included, HashSet<Type> excluded)
+	public struct FilterSignature
 	{
-		Included = included;
-		Excluded = excluded;
-	}
+		private const int HASH_FACTOR = 97;
 
-	public override bool Equals(object? obj)
-	{
-		return obj is FilterSignature signature && Equals(signature);
-	}
+		public HashSet<Type> Included;
+		public HashSet<Type> Excluded;
 
-	public bool Equals(FilterSignature other)
-	{
-		return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
-	}
-
-	private int GuidToInt(Guid guid)
-	{
-		return BitConverter.ToInt32(guid.ToByteArray());
-	}
-
-	public override int GetHashCode()
-	{
-		int result = 1;
-		foreach (var type in Included)
+		public FilterSignature(HashSet<Type> included, HashSet<Type> excluded)
 		{
-			result *= HASH_FACTOR + GuidToInt(type.GUID);
+			Included = included;
+			Excluded = excluded;
 		}
 
-		// FIXME: Is there a way to avoid collisions when this is the same set as included?
-		foreach (var type in Excluded)
+		public override bool Equals(object? obj)
 		{
-			result *= HASH_FACTOR + GuidToInt(type.GUID);
+			return obj is FilterSignature signature && Equals(signature);
 		}
 
-		return result;
+		public bool Equals(FilterSignature other)
+		{
+			return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
+		}
+
+		private int GuidToInt(Guid guid)
+		{
+			return BitConverter.ToInt32(guid.ToByteArray());
+		}
+
+		public override int GetHashCode()
+		{
+			int result = 1;
+			foreach (var type in Included)
+			{
+				result *= HASH_FACTOR + GuidToInt(type.GUID);
+			}
+
+			// FIXME: Is there a way to avoid collisions when this is the same set as included?
+			foreach (var type in Excluded)
+			{
+				result *= HASH_FACTOR + GuidToInt(type.GUID);
+			}
+
+			return result;
+		}
 	}
 }

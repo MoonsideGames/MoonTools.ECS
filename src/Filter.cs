@@ -1,20 +1,24 @@
-namespace MoonTools.ECS;
+﻿using System;
+using System.Collections.Generic;
 
-public class Filter
+namespace MoonTools.ECS
 {
-	internal FilterSignature Signature;
-	private ComponentDepot ComponentDepot;
-
-	internal Filter(ComponentDepot componentDepot, HashSet<Type> included, HashSet<Type> excluded)
+	public class Filter
 	{
-		ComponentDepot = componentDepot;
-		Signature = new FilterSignature(included, excluded);
+		internal FilterSignature Signature;
+		private ComponentDepot ComponentDepot;
+
+		internal Filter(ComponentDepot componentDepot, HashSet<Type> included, HashSet<Type> excluded)
+		{
+			ComponentDepot = componentDepot;
+			Signature = new FilterSignature(included, excluded);
+		}
+
+		public IEnumerable<Entity> Entities => ComponentDepot.FilterEntities(this);
+		public IEnumerable<Entity> EntitiesInRandomOrder => ComponentDepot.FilterEntitiesRandom(this);
+		public Entity RandomEntity => ComponentDepot.FilterRandomEntity(this);
+
+		public int Count => ComponentDepot.FilterCount(this);
+		public bool Empty => Count == 0;
 	}
-
-	public IEnumerable<Entity> Entities => ComponentDepot.FilterEntities(this);
-	public IEnumerable<Entity> EntitiesInRandomOrder => ComponentDepot.FilterEntitiesRandom(this);
-	public Entity RandomEntity => ComponentDepot.FilterRandomEntity(this);
-
-	public int Count => ComponentDepot.FilterCount(this);
-	public bool Empty => Count == 0;
 }

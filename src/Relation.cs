@@ -1,3 +1,5 @@
+﻿using System;
+
 namespace MoonTools.ECS
 {
 	public struct Relation : IEquatable<Relation>

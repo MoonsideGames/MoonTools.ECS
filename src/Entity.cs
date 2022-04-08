@@ -1,26 +1,29 @@
-﻿namespace MoonTools.ECS;
+﻿using System;
 
-public struct Entity : IEquatable<Entity>
+namespace MoonTools.ECS
 {
-	public int ID { get; }
-
-	internal Entity(int id)
+	public struct Entity : IEquatable<Entity>
 	{
-		ID = id;
-	}
+		public int ID { get; }
 
-	public override bool Equals(object? obj)
-	{
-		return obj is Entity entity && Equals(entity);
-	}
+		internal Entity(int id)
+		{
+			ID = id;
+		}
 
-	public override int GetHashCode()
-	{
-		return HashCode.Combine(ID);
-	}
+		public override bool Equals(object? obj)
+		{
+			return obj is Entity entity && Equals(entity);
+		}
 
-	public bool Equals(Entity other)
-	{
-		return ID == other.ID;
+		public override int GetHashCode()
+		{
+			return HashCode.Combine(ID);
+		}
+
+		public bool Equals(Entity other)
+		{
+			return ID == other.ID;
+		}
 	}
 }

@@ -1,6 +1,7 @@
-namespace MoonTools.ECS;
-
-public interface IHasEntity
+﻿namespace MoonTools.ECS
 {
-	Entity Entity { get; }
+	public interface IHasEntity
+	{
+		Entity Entity { get; }
+	}
 }

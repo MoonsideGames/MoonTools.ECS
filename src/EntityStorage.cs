@@ -1,21 +1,22 @@
-﻿namespace MoonTools.ECS;
-
-internal class EntityStorage
+﻿namespace MoonTools.ECS
 {
-	public IDStorage idStorage = new IDStorage();
-
-	public Entity Create()
+	internal class EntityStorage
 	{
-		return new Entity(idStorage.NextID());
-	}
+		public IDStorage idStorage = new IDStorage();
 
-	public bool Exists(in Entity entity)
-	{
-		return idStorage.Taken(entity.ID);
-	}
+		public Entity Create()
+		{
+			return new Entity(idStorage.NextID());
+		}
 
-	public void Destroy(in Entity entity)
-	{
-		idStorage.Release(entity.ID);
+		public bool Exists(in Entity entity)
+		{
+			return idStorage.Taken(entity.ID);
+		}
+
+		public void Destroy(in Entity entity)
+		{
+			idStorage.Release(entity.ID);
+		}
 	}
 }

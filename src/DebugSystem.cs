@@ -1,7 +1,10 @@
-// NOTE: these methods are very inefficient
+﻿// NOTE: these methods are very inefficient
 // this class should only be used in debugging contexts!!
 
 #if DEBUG
+using System;
+using System.Collections.Generic;
+
 namespace MoonTools.ECS
 {
 	public abstract class DebugSystem : System

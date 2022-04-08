@@ -1,36 +1,39 @@
-﻿namespace MoonTools.ECS;
+﻿using System.Collections.Generic;
 
-internal class IDStorage
+namespace MoonTools.ECS
 {
-	private int nextID = 0;
-
-	private readonly Stack<int> availableIDs = new Stack<int>();
-	private readonly HashSet<int> availableIDHash = new HashSet<int>();
-
-	public int NextID()
+	internal class IDStorage
 	{
-		if (availableIDs.Count > 0)
+		private int nextID = 0;
+
+		private readonly Stack<int> availableIDs = new Stack<int>();
+		private readonly HashSet<int> availableIDHash = new HashSet<int>();
+
+		public int NextID()
 		{
-			var id = availableIDs.Pop();
-			availableIDHash.Remove(id);
-			return id;
+			if (availableIDs.Count > 0)
+			{
+				var id = availableIDs.Pop();
+				availableIDHash.Remove(id);
+				return id;
+			}
+			else
+			{
+				var id = nextID;
+				nextID += 1;
+				return id;
+			}
 		}
-		else
+
+		public bool Taken(int id)
 		{
-			var id = nextID;
-			nextID += 1;
-			return id;
+			return !availableIDHash.Contains(id) && id < nextID;
 		}
-	}
 
-	public bool Taken(int id)
-	{
-		return !availableIDHash.Contains(id) && id < nextID;
-	}
-
-	public void Release(int id)
-	{
-		availableIDs.Push(id);
-		availableIDHash.Add(id);
+		public void Release(int id)
+		{
+			availableIDs.Push(id);
+			availableIDHash.Add(id);
+		}
 	}
 }

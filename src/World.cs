@@ -22,11 +22,6 @@
 			renderer.RegisterRelationDepot(RelationDepot);
 		}
 
-		public void AddRelationKind<TRelationKind>()
-		{
-			RelationDepot.Register<TRelationKind>();
-		}
-
 		public Entity CreateEntity()
 		{
 			return EntityStorage.Create();

@@ -2,7 +2,7 @@
 
 namespace MoonTools.ECS
 {
-	public struct Relation : IEquatable<Relation>
+	internal struct Relation : IEquatable<Relation>
 	{
 		public Entity A { get; }
 		public Entity B { get; }
@@ -26,12 +26,12 @@ namespace MoonTools.ECS
 
 		public bool Equals(Relation other)
 		{
-			return A.Equals(other.A) && B.Equals(other.B);
+			return A.ID == other.A.ID && B.ID == other.B.ID;
 		}
 
 		public override int GetHashCode()
 		{
-			return HashCode.Combine(A, B);
+			return HashCode.Combine(A.ID, B.ID);
 		}
 	}
 }

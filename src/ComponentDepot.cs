@@ -37,7 +37,7 @@ namespace MoonTools.ECS
 		{
 			// TODO: is it possible to optimize this?
 			Register<TComponent>();
-			return storages[typeof(TComponent)] as ComponentStorage<TComponent>;
+			return (ComponentStorage<TComponent>) storages[typeof(TComponent)];
 		}
 
 		public bool Some<TComponent>() where TComponent : struct

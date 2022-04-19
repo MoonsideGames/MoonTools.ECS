@@ -60,22 +60,22 @@ namespace MoonTools.ECS
 			return EntityStorage.Exists(entity);
 		}
 
-		protected IEnumerable<Relation> Relations<TRelationKind>()
+		protected IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : struct
 		{
 			return RelationDepot.Relations<TRelationKind>();
 		}
 
-		protected bool Related<TRelationKind>(in Entity a, in Entity b)
+		protected bool Related<TRelationKind>(in Entity a, in Entity b) where TRelationKind : struct
 		{
 			return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
 		}
 
-		protected IEnumerable<Entity> RelatedToA<TRelationKind>(in Entity entity)
+		protected IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(in Entity entity) where TRelationKind : struct
 		{
 			return RelationDepot.RelatedToA<TRelationKind>(entity.ID);
 		}
 
-		protected IEnumerable<Entity> RelatedToB<TRelationKind>(in Entity entity)
+		protected IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(in Entity entity) where TRelationKind : struct
 		{
 			return RelationDepot.RelatedToB<TRelationKind>(entity.ID);
 		}

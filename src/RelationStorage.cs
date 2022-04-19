@@ -2,24 +2,31 @@
 
 namespace MoonTools.ECS
 {
-	internal class RelationStorage
+	internal abstract class RelationStorage
 	{
-		private HashSet<Relation> relations = new HashSet<Relation>(16);
+		public abstract void OnEntityDestroy(int entityID);
+	}
+
+	// Relation is the two entities, A related to B.
+	// TRelation is the data attached to the relation.
+	internal class RelationStorage<TRelation> : RelationStorage where TRelation : struct
+	{
+		private Dictionary<Relation, TRelation> relations = new Dictionary<Relation, TRelation>(16);
 		private Dictionary<int, HashSet<int>> entitiesRelatedToA = new Dictionary<int, HashSet<int>>(16);
 		private Dictionary<int, HashSet<int>> entitiesRelatedToB = new Dictionary<int, HashSet<int>>(16);
 		private Stack<HashSet<int>> listPool = new Stack<HashSet<int>>();
 
-		public IEnumerable<Relation> All()
+		public IEnumerable<(Entity, Entity, TRelation)> All()
 		{
-			foreach (var relation in relations)
+			foreach (var relationData in relations)
 			{
-				yield return relation;
+				yield return (relationData.Key.A, relationData.Key.B, relationData.Value);
 			}
 		}
 
-		public void Add(Relation relation)
+		public void Add(Relation relation, TRelation relationData)
 		{
-			if (relations.Contains(relation)) { return; }
+			if (relations.ContainsKey(relation)) { return; }
 
 			var idA = relation.A.ID;
 			var idB = relation.B.ID;
@@ -36,32 +43,35 @@ namespace MoonTools.ECS
 			}
 			entitiesRelatedToB[idB].Add(idA);
 
-			relations.Add(relation);
+			relations.Add(relation, relationData);
 		}
 
 		public bool Has(Relation relation)
 		{
-			return relations.Contains(relation);
+			return relations.ContainsKey(relation);
 		}
 
-		public IEnumerable<Entity> RelatedToA(int entityID)
+		// FIXME: is there a more descriptive name for these?
+		public IEnumerable<(Entity, TRelation)> RelatedToA(int entityID)
 		{
 			if (entitiesRelatedToA.ContainsKey(entityID))
 			{
 				foreach (var id in entitiesRelatedToA[entityID])
 				{
-					yield return new Entity(id);
+					var relation = new Relation(entityID, id);
+					yield return (relation.B, relations[relation]);
 				}
 			}
 		}
 
-		public IEnumerable<Entity> RelatedToB(int entityID)
+		public IEnumerable<(Entity, TRelation)> RelatedToB(int entityID)
 		{
 			if (entitiesRelatedToB.ContainsKey(entityID))
 			{
 				foreach (var id in entitiesRelatedToB[entityID])
 				{
-					yield return new Entity(id);
+					var relation = new Relation(id, entityID);
+					yield return (relation.A, relations[relation]);
 				}
 			}
 		}
@@ -81,19 +91,13 @@ namespace MoonTools.ECS
 			return relations.Remove(relation);
 		}
 
-		// this exists so we don't recurse in OnEntityDestroy
-		private bool DestroyRemove(Relation relation)
-		{
-			return relations.Remove(relation);
-		}
-
-		public void OnEntityDestroy(int entityID)
+		public override void OnEntityDestroy(int entityID)
 		{
 			if (entitiesRelatedToA.ContainsKey(entityID))
 			{
 				foreach (var entityB in entitiesRelatedToA[entityID])
 				{
-					DestroyRemove(new Relation(entityID, entityB));
+					Remove(new Relation(entityID, entityB));
 				}
 
 				ReturnHashSetToPool(entitiesRelatedToA[entityID]);
@@ -104,7 +108,7 @@ namespace MoonTools.ECS
 			{
 				foreach (var entityA in entitiesRelatedToB[entityID])
 				{
-					DestroyRemove(new Relation(entityA, entityID));
+					Remove(new Relation(entityA, entityID));
 				}
 
 				ReturnHashSetToPool(entitiesRelatedToB[entityID]);
@@ -124,6 +128,7 @@ namespace MoonTools.ECS
 
 		private void ReturnHashSetToPool(HashSet<int> hashSet)
 		{
+			hashSet.Clear();
 			listPool.Push(hashSet);
 		}
 	}

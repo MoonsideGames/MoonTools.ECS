@@ -76,12 +76,12 @@ namespace MoonTools.ECS
 			MessageDepot.Add(message);
 		}
 
-		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB)
+		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : struct
 		{
-			RelationDepot.Add<TRelationKind>(new Relation(entityA, entityB));
+			RelationDepot.Add<TRelationKind>(new Relation(entityA, entityB), relationData);
 		}
 
-		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB)
+		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : struct
 		{
 			RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
 		}

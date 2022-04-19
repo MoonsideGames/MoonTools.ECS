@@ -7,26 +7,31 @@ namespace MoonTools.ECS
 	{
 		private Dictionary<Type, RelationStorage> storages = new Dictionary<Type, RelationStorage>();
 
-		private RelationStorage Lookup<TRelationKind>()
+		private void Register<TRelationKind>() where TRelationKind : struct
 		{
-			return storages[typeof(TRelationKind)];
+			if (!storages.ContainsKey(typeof(TRelationKind)))
+			{
+				storages.Add(typeof(TRelationKind), new RelationStorage<TRelationKind>());
+			}
 		}
 
-		public void Register<TRelationKind>()
+		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : struct
 		{
-			storages[typeof(TRelationKind)] = new RelationStorage();
+			Register<TRelationKind>();
+			return (RelationStorage<TRelationKind>) storages[typeof(TRelationKind)];
 		}
 
-		public void Add<TRelationKind>(Relation relation)
+		public void Add<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : struct
 		{
-			Lookup<TRelationKind>().Add(relation);
+			Lookup<TRelationKind>().Add(relation, relationData);
 		}
 
-		public void Remove<TRelationKind>(Relation relation)
+		public void Remove<TRelationKind>(Relation relation) where TRelationKind : struct
 		{
 			Lookup<TRelationKind>().Remove(relation);
 		}
 
+		// FIXME: optimize this
 		public void OnEntityDestroy(int entityID)
 		{
 			foreach (var storage in storages.Values)
@@ -35,22 +40,22 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public IEnumerable<Relation> Relations<TRelationKind>()
+		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : struct
 		{
 			return Lookup<TRelationKind>().All();
 		}
 
-		public bool Related<TRelationKind>(int idA, int idB)
+		public bool Related<TRelationKind>(int idA, int idB) where TRelationKind : struct
 		{
 			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
 		}
 
-		public IEnumerable<Entity> RelatedToA<TRelationKind>(int entityID)
+		public IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(int entityID) where TRelationKind : struct
 		{
 			return Lookup<TRelationKind>().RelatedToA(entityID);
 		}
 
-		public IEnumerable<Entity> RelatedToB<TRelationKind>(int entityID)
+		public IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(int entityID) where TRelationKind : struct
 		{
 			return Lookup<TRelationKind>().RelatedToB(entityID);
 		}

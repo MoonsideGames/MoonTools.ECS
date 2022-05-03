@@ -11,13 +11,13 @@ namespace MoonTools.ECS
 
 		private Dictionary<Type, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<Type, HashSet<FilterSignature>>();
 
-		private Dictionary<int, HashSet<Type>> entityComponentMap = new Dictionary<int, HashSet<Type>>();
-
 #if DEBUG
 		private Dictionary<Type, Filter> singleComponentFilters = new Dictionary<Type, Filter>();
 #endif
 
-		internal void Register<TComponent>() where TComponent : struct
+		private HashSet<Type> TypesWithDisabledSerialization = new HashSet<Type>();
+
+		internal void Register<TComponent>() where TComponent : unmanaged
 		{
 			if (!storages.ContainsKey(typeof(TComponent)))
 			{
@@ -33,19 +33,19 @@ namespace MoonTools.ECS
 			return storages[type];
 		}
 
-		private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : struct
+		private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : unmanaged
 		{
 			// TODO: is it possible to optimize this?
 			Register<TComponent>();
 			return (ComponentStorage<TComponent>) storages[typeof(TComponent)];
 		}
 
-		public bool Some<TComponent>() where TComponent : struct
+		public bool Some<TComponent>() where TComponent : unmanaged
 		{
 			return Lookup<TComponent>().Any();
 		}
 
-		public bool Has<TComponent>(int entityID) where TComponent : struct
+		public bool Has<TComponent>(int entityID) where TComponent : unmanaged
 		{
 			return Lookup<TComponent>().Has(entityID);
 		}
@@ -55,29 +55,22 @@ namespace MoonTools.ECS
 			return Lookup(type).Has(entityID);
 		}
 
-		public ref readonly TComponent Get<TComponent>(int entityID) where TComponent : struct
+		public ref readonly TComponent Get<TComponent>(int entityID) where TComponent : unmanaged
 		{
 			return ref Lookup<TComponent>().Get(entityID);
 		}
 
-		public ref readonly TComponent Get<TComponent>() where TComponent : struct
+		public ref readonly TComponent Get<TComponent>() where TComponent : unmanaged
 		{
 			return ref Lookup<TComponent>().Get();
 		}
 
-		public void Set<TComponent>(int entityID, in TComponent component) where TComponent : struct
+		public void Set<TComponent>(int entityID, in TComponent component) where TComponent : unmanaged
 		{
-			Lookup<TComponent>().Set(entityID, component);
-
-			if (!entityComponentMap.ContainsKey(entityID))
-			{
-				entityComponentMap.Add(entityID, new HashSet<Type>());
-			}
-
-			var notFound = entityComponentMap[entityID].Add(typeof(TComponent));
+			var existed = Lookup<TComponent>().Set(entityID, component);
 
 			// update filters
-			if (notFound)
+			if (!existed)
 			{
 				if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
 				{
@@ -89,24 +82,22 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public Entity GetSingletonEntity<TComponent>() where TComponent : struct
+		public Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
 		{
 			return Lookup<TComponent>().FirstEntity();
 		}
 
-		public ReadOnlySpan<TComponent> ReadComponents<TComponent>() where TComponent : struct
+		public ReadOnlySpan<TComponent> ReadComponents<TComponent>() where TComponent : unmanaged
 		{
 			return Lookup<TComponent>().AllComponents();
 		}
 
 		private void Remove(Type type, int entityID)
 		{
-			Lookup(type).Remove(entityID);
-
-			var found = entityComponentMap[entityID].Remove(type);
+			var existed = Lookup(type).Remove(entityID);
 
 			// update filters
-			if (found)
+			if (existed)
 			{
 				if (typeToFilterSignatures.TryGetValue(type, out var filterSignatures))
 				{
@@ -118,14 +109,12 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public void Remove<TComponent>(int entityID) where TComponent : struct
+		public void Remove<TComponent>(int entityID) where TComponent : unmanaged
 		{
-			Lookup<TComponent>().Remove(entityID);
-
-			var found = entityComponentMap[entityID].Remove(typeof(TComponent));
+			var existed = Lookup<TComponent>().Remove(entityID);
 
 			// update filters
-			if (found)
+			if (existed)
 			{
 				if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
 				{
@@ -137,16 +126,12 @@ namespace MoonTools.ECS
 			}
 		}
 
+		// TODO: is there some way to optimize this without complicating serialization?
 		public void OnEntityDestroy(int entityID)
 		{
-			if (entityComponentMap.ContainsKey(entityID))
+			foreach (var type in storages.Keys)
 			{
-				foreach (var type in entityComponentMap[entityID])
-				{
-					Remove(type, entityID);
-				}
-
-				entityComponentMap.Remove(entityID);
+				Remove(type, entityID);
 			}
 		}
 
@@ -229,6 +214,53 @@ namespace MoonTools.ECS
 			}
 
 			filterSignatureToEntityIDs[filterSignature].Add(entityID);
+		}
+
+		public void DisableSerialization<TComponent>() where TComponent : unmanaged
+		{
+			TypesWithDisabledSerialization.Add(typeof(TComponent));
+		}
+
+		public void Save(ComponentDepotState state)
+		{
+			foreach (var (type, storage) in storages)
+			{
+				if (!TypesWithDisabledSerialization.Contains(type))
+				{
+					if (!state.StorageStates.ContainsKey(type))
+					{
+						state.StorageStates.Add(type, storage.CreateState());
+					}
+
+					storage.Save(state.StorageStates[type]);
+				}
+			}
+
+			foreach (var (signature, set) in filterSignatureToEntityIDs)
+			{
+				// FIXME: we could cache this
+				if (!signature.Included.Overlaps(TypesWithDisabledSerialization) && !signature.Excluded.Overlaps(TypesWithDisabledSerialization))
+				{
+					if (!state.FilterStates.ContainsKey(signature))
+					{
+						state.FilterStates[signature] = new IndexableSetState<int>(set.Count);
+					}
+					set.Save(state.FilterStates[signature]);
+				}
+			}
+		}
+
+		public void Load(ComponentDepotState state)
+		{
+			foreach (var (type, storageState) in state.StorageStates)
+			{
+				storages[type].Load(storageState);
+			}
+
+			foreach (var (signature, setState) in state.FilterStates)
+			{
+				filterSignatureToEntityIDs[signature].Load(setState);
+			}
 		}
 
 #if DEBUG

@@ -1,17 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
 	internal abstract class ComponentStorage
 	{
 		public abstract bool Has(int entityID);
-		public abstract void Remove(int entityID);
+		public abstract bool Remove(int entityID);
 		public abstract object Debug_Get(int entityID);
+		public abstract ComponentStorageState CreateState();
+		public abstract void Save(ComponentStorageState state);
+		public abstract void Load(ComponentStorageState state);
 	}
 
-	// FIXME: we can probably get rid of this weird entity storage system by using filters
-	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : struct
+	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
 	{
 		private int nextID;
 		private readonly Dictionary<int, int> entityIDToStorageIndex = new Dictionary<int, int>(16);
@@ -49,8 +52,11 @@ namespace MoonTools.ECS
 			return ref components[0];
 		}
 
-		public void Set(int entityID, in TComponent component)
+		// Returns true if the entity already had this component.
+		public bool Set(int entityID, in TComponent component)
 		{
+			bool result = true;
+
 			if (!entityIDToStorageIndex.ContainsKey(entityID))
 			{
 				var index = nextID;
@@ -64,12 +70,17 @@ namespace MoonTools.ECS
 
 				entityIDToStorageIndex[entityID] = index;
 				entityIDs[index] = entityID;
+
+				result = false;
 			}
 
 			components[entityIDToStorageIndex[entityID]] = component;
+
+			return result;
 		}
 
-		public override void Remove(int entityID)
+		// Returns true if the entity had this component.
+		public override bool Remove(int entityID)
 		{
 			if (entityIDToStorageIndex.ContainsKey(entityID))
 			{
@@ -88,7 +99,11 @@ namespace MoonTools.ECS
 				}
 
 				nextID -= 1;
+
+				return true;
 			}
+
+			return false;
 		}
 
 		public void Clear()
@@ -105,6 +120,45 @@ namespace MoonTools.ECS
 		public Entity FirstEntity()
 		{
 			return new Entity(entityIDs[0]);
+		}
+
+		public override ComponentStorageState CreateState()
+		{
+			return ComponentStorageState.Create<TComponent>(nextID);
+		}
+
+		public override void Save(ComponentStorageState state)
+		{
+			ReadOnlySpan<byte> entityIDBytes = MemoryMarshal.Cast<int, byte>(new ReadOnlySpan<int>(entityIDs, 0, nextID));
+
+			if (entityIDBytes.Length > state.EntityIDs.Length)
+			{
+				Array.Resize(ref state.EntityIDs, entityIDBytes.Length);
+			}
+			entityIDBytes.CopyTo(state.EntityIDs);
+
+			ReadOnlySpan<byte> componentBytes = MemoryMarshal.Cast<TComponent, byte>(AllComponents());
+			if (componentBytes.Length > state.Components.Length)
+			{
+				Array.Resize(ref state.Components, componentBytes.Length);
+			}
+			componentBytes.CopyTo(state.Components);
+
+			state.Count = nextID;
+		}
+
+		public override void Load(ComponentStorageState state)
+		{
+			state.EntityIDs.CopyTo(MemoryMarshal.Cast<int, byte>(entityIDs));
+			state.Components.CopyTo(MemoryMarshal.Cast<TComponent, byte>(components));
+
+			entityIDToStorageIndex.Clear();
+			for (var i = 0; i < state.Count; i += 1)
+			{
+				entityIDToStorageIndex[entityIDs[i]] = i;
+			}
+
+			nextID = state.Count;
 		}
 	}
 }

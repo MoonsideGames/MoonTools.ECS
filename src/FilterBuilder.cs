@@ -23,14 +23,14 @@ namespace MoonTools.ECS
 			Excluded = excluded;
 		}
 
-		public FilterBuilder Include<TComponent>() where TComponent : struct
+		public FilterBuilder Include<TComponent>() where TComponent : unmanaged
 		{
 			ComponentDepot.Register<TComponent>();
 			Included.Add(typeof(TComponent));
 			return new FilterBuilder(ComponentDepot, Included, Excluded);
 		}
 
-		public FilterBuilder Exclude<TComponent>() where TComponent : struct
+		public FilterBuilder Exclude<TComponent>() where TComponent : unmanaged
 		{
 			ComponentDepot.Register<TComponent>();
 			Excluded.Add(typeof(TComponent));

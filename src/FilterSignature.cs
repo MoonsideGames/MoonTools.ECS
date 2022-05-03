@@ -7,8 +7,8 @@ namespace MoonTools.ECS
 	{
 		private const int HASH_FACTOR = 97;
 
-		public HashSet<Type> Included;
-		public HashSet<Type> Excluded;
+		public readonly HashSet<Type> Included;
+		public readonly HashSet<Type> Excluded;
 
 		public FilterSignature(HashSet<Type> included, HashSet<Type> excluded)
 		{

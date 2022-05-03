@@ -2,9 +2,6 @@
 {
 	public abstract class Renderer : EntityComponentReader
 	{
-		public Renderer(World world)
-		{
-			world.AddRenderer(this);
-		}
+		public Renderer(World world) : base(world) { }
 	}
 }

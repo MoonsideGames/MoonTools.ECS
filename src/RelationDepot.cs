@@ -7,7 +7,7 @@ namespace MoonTools.ECS
 	{
 		private Dictionary<Type, RelationStorage> storages = new Dictionary<Type, RelationStorage>();
 
-		private void Register<TRelationKind>() where TRelationKind : struct
+		private void Register<TRelationKind>() where TRelationKind : unmanaged
 		{
 			if (!storages.ContainsKey(typeof(TRelationKind)))
 			{
@@ -15,18 +15,18 @@ namespace MoonTools.ECS
 			}
 		}
 
-		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : struct
+		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : unmanaged
 		{
 			Register<TRelationKind>();
 			return (RelationStorage<TRelationKind>) storages[typeof(TRelationKind)];
 		}
 
-		public void Add<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : struct
+		public void Set<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : unmanaged
 		{
-			Lookup<TRelationKind>().Add(relation, relationData);
+			Lookup<TRelationKind>().Set(relation, relationData);
 		}
 
-		public void Remove<TRelationKind>(Relation relation) where TRelationKind : struct
+		public void Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
 		{
 			Lookup<TRelationKind>().Remove(relation);
 		}
@@ -40,24 +40,45 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : struct
+		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().All();
 		}
 
-		public bool Related<TRelationKind>(int idA, int idB) where TRelationKind : struct
+		public bool Related<TRelationKind>(int idA, int idB) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(int entityID) where TRelationKind : struct
+		public IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().RelatedToA(entityID);
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(int entityID) where TRelationKind : struct
+		public IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().RelatedToB(entityID);
+		}
+
+		public void Save(RelationDepotState state)
+		{
+			foreach (var (type, storage) in storages)
+			{
+				if (!state.StorageStates.ContainsKey(type))
+				{
+					state.StorageStates.Add(type, storage.CreateState());
+				}
+
+				storage.Save(state.StorageStates[type]);
+			}
+		}
+
+		public void Load(RelationDepotState state)
+		{
+			foreach (var (type, storageState) in state.StorageStates)
+			{
+				storages[type].Load(storageState);
+			}
 		}
 	}
 }

@@ -5,7 +5,7 @@ namespace MoonTools.ECS
 {
 	public abstract class EntityComponentReader
 	{
-		protected readonly World World;
+		internal readonly World World;
 		internal EntityStorage EntityStorage => World.EntityStorage;
 		internal ComponentDepot ComponentDepot => World.ComponentDepot;
 		internal RelationDepot RelationDepot => World.RelationDepot;

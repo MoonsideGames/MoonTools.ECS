@@ -66,7 +66,7 @@ namespace MoonTools.ECS
 
 		public IEnumerator<T> GetEnumerator()
 		{
-			for (var i = 0; i < Count; i += 1)
+			for (var i = Count - 1; i >= 0; i -= 1)
 			{
 				yield return array[i];
 			}
@@ -74,7 +74,7 @@ namespace MoonTools.ECS
 
 		IEnumerator IEnumerable.GetEnumerator()
 		{
-			for (var i = 0; i < Count; i += 1)
+			for (var i = Count - 1; i >= 0; i -= 1)
 			{
 				yield return array[i];
 			}

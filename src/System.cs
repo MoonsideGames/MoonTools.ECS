@@ -78,6 +78,7 @@ namespace MoonTools.ECS
 			RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
 		}
 
+		// FIXME: this is insanely inefficient
 		protected void Destroy(in Entity entity)
 		{
 			ComponentDepot.OnEntityDestroy(entity.ID);

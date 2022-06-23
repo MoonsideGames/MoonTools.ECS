@@ -59,6 +59,7 @@ namespace MoonTools.ECS
 
 			if (count >= relationDatas.Length)
 			{
+				Array.Resize(ref relations, relations.Length * 2);
 				Array.Resize(ref relationDatas, relationDatas.Length * 2);
 			}
 

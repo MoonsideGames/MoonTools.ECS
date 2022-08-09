@@ -80,6 +80,11 @@ namespace MoonTools.ECS
 			}
 		}
 
+		public void Clear()
+		{
+			Count = 0;
+		}
+
 		public void Save(IndexableSetState<T> state)
 		{
 			ReadOnlySpan<byte> arrayBytes = MemoryMarshal.Cast<T, byte>(array);

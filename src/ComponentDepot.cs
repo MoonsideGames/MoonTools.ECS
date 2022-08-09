@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MoonTools.ECS
 {
@@ -17,6 +18,7 @@ namespace MoonTools.ECS
 
 		private HashSet<Type> TypesWithDisabledSerialization = new HashSet<Type>();
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		internal void Register<TComponent>() where TComponent : unmanaged
 		{
 			if (!storages.ContainsKey(typeof(TComponent)))
@@ -33,6 +35,7 @@ namespace MoonTools.ECS
 			return storages[type];
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : unmanaged
 		{
 			// TODO: is it possible to optimize this?

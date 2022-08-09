@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MoonTools.ECS
 {
@@ -15,6 +16,7 @@ namespace MoonTools.ECS
 			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : unmanaged
 		{
 			Register<TRelationKind>();
@@ -29,6 +31,11 @@ namespace MoonTools.ECS
 		public void Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
 		{
 			Lookup<TRelationKind>().Remove(relation);
+		}
+
+		public void UnrelateAll<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			Lookup<TRelationKind>().UnrelateAll(entityID);
 		}
 
 		// FIXME: optimize this
@@ -50,14 +57,44 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().RelatedToA(entityID);
+			return Lookup<TRelationKind>().OutRelations(entityID);
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().RelatedToB(entityID);
+			return Lookup<TRelationKind>().OutFirst(entityID);
+		}
+
+		public int OutRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().OutRelationCount(entityID);
+		}
+
+		public bool HasOutRelation<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().HasOutRelation(entityID);
+		}
+
+		public IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().InRelations(entityID);
+		}
+
+		public (Entity, TRelationKind) InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().InFirst(entityID);
+		}
+
+		public bool HasInRelation<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().HasInRelation(entityID);
+		}
+
+		public int InRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().InRelationCount(entityID);
 		}
 
 		public void Save(RelationDepotState state)

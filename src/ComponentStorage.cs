@@ -46,7 +46,7 @@ namespace MoonTools.ECS
 #if DEBUG
 			if (nextID == 0)
 			{
-				throw new ArgumentOutOfRangeException("Component storage is empty!");
+				throw new IndexOutOfRangeException("Component storage is empty!");
 			}
 #endif
 			return ref components[0];
@@ -119,6 +119,12 @@ namespace MoonTools.ECS
 
 		public Entity FirstEntity()
 		{
+#if DEBUG
+			if (nextID == 0)
+			{
+				throw new IndexOutOfRangeException("Component storage is empty!");
+			}
+#endif
 			return new Entity(entityIDs[0]);
 		}
 

@@ -61,14 +61,46 @@ namespace MoonTools.ECS
 			return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
 		}
 
-		protected IEnumerable<(Entity, TRelationKind)> RelatedToA<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		// relations go A->B, so given A, will give all outgoing B relations.
+		protected IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
-			return RelationDepot.RelatedToA<TRelationKind>(entity.ID);
+			return RelationDepot.OutRelations<TRelationKind>(entity.ID);
 		}
 
-		protected IEnumerable<(Entity, TRelationKind)> RelatedToB<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
-			return RelationDepot.RelatedToB<TRelationKind>(entity.ID);
+			return RelationDepot.OutRelationSingleton<TRelationKind>(entity.ID);
+		}
+
+		protected bool HasOutRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.HasOutRelation<TRelationKind>(entity.ID);
+		}
+
+		protected int OutRelationCount<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.OutRelationCount<TRelationKind>(entity.ID);
+		}
+
+		// Relations go A->B, so given B, will give all incoming A relations.
+		protected IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.InRelations<TRelationKind>(entity.ID);
+		}
+
+		protected (Entity, TRelationKind) InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.InRelationSingleton<TRelationKind>(entity.ID);
+		}
+
+		protected bool HasInRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.HasInRelation<TRelationKind>(entity.ID);
+		}
+
+		protected int InRelationCount<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			return RelationDepot.InRelationCount<TRelationKind>(entity.ID);
 		}
 	}
 }

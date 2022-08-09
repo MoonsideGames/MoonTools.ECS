@@ -78,6 +78,11 @@ namespace MoonTools.ECS
 			RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
 		}
 
+		protected void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			RelationDepot.UnrelateAll<TRelationKind>(entity.ID);
+		}
+
 		// FIXME: this is insanely inefficient
 		protected void Destroy(in Entity entity)
 		{

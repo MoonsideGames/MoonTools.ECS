@@ -25,5 +25,15 @@ namespace MoonTools.ECS
 		{
 			return ID == other.ID;
 		}
+
+		public static bool operator ==(Entity a, Entity b)
+		{
+			return a.Equals(b);
+		}
+
+		public static bool operator !=(Entity a, Entity b)
+		{
+			return !a.Equals(b);
+		}
 	}
 }

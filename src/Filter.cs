@@ -20,5 +20,8 @@ namespace MoonTools.ECS
 
 		public int Count => ComponentDepot.FilterCount(this);
 		public bool Empty => Count == 0;
+
+		// WARNING: this WILL crash if the index is out of range!
+		public Entity NthEntity(int index) => ComponentDepot.FilterNthEntity(this, index);
 	}
 }

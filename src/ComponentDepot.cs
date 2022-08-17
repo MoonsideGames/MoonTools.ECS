@@ -185,6 +185,11 @@ namespace MoonTools.ECS
 			}
 		}
 
+		public Entity FilterNthEntity(Filter filter, int index)
+		{
+			return new Entity(filterSignatureToEntityIDs[filter.Signature][index]);
+		}
+
 		public Entity FilterRandomEntity(Filter filter)
 		{
 			var randomIndex = RandomGenerator.Next(FilterCount(filter));

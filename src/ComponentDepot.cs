@@ -25,12 +25,6 @@ namespace MoonTools.ECS
 			storages[index] = new ComponentStorage<TComponent>();
 		}
 
-		// FIXME: is this necessary?
-		private ComponentStorage Lookup(Type type)
-		{
-			return storages[ComponentTypeIndices.GetIndex(type)];
-		}
-
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : unmanaged
 		{

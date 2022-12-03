@@ -9,7 +9,7 @@ namespace MoonTools.ECS
 		public abstract RelationStorageState CreateState();
 		public abstract void Save(RelationStorageState state);
 		public abstract void Load(RelationStorageState state);
-		public abstract void OnEntityDestroy(int entityID);
+		public abstract void UnrelateAll(int entityID);
 	}
 
 	// Relation is the two entities, A related to B.
@@ -144,16 +144,27 @@ namespace MoonTools.ECS
 			return inRelations.ContainsKey(entityID) ? inRelations[entityID].Count : 0;
 		}
 
-		public bool Remove(Relation relation)
+		public (bool, bool) Remove(Relation relation)
 		{
+			var aEmpty = false;
+			var bEmpty = false;
+
 			if (outRelations.ContainsKey(relation.A.ID))
 			{
 				outRelations[relation.A.ID].Remove(relation.B.ID);
+				if (outRelations[relation.A.ID].Count == 0)
+				{
+					aEmpty = true;
+				}
 			}
 
 			if (inRelations.ContainsKey(relation.B.ID))
 			{
 				inRelations[relation.B.ID].Remove(relation.A.ID);
+				if (inRelations[relation.B.ID].Count == 0)
+				{
+					bEmpty = true;
+				}
 			}
 
 			if (indices.ContainsKey(relation))
@@ -172,13 +183,12 @@ namespace MoonTools.ECS
 
 				count -= 1;
 				indices.Remove(relation);
-				return true;
 			}
 
-			return false;
+			return (aEmpty, bEmpty);
 		}
 
-		public void UnrelateAll(int entityID)
+		public override void UnrelateAll(int entityID)
 		{
 			if (outRelations.ContainsKey(entityID))
 			{
@@ -201,11 +211,6 @@ namespace MoonTools.ECS
 				ReturnHashSetToPool(inRelations[entityID]);
 				inRelations.Remove(entityID);
 			}
-		}
-
-		public override void OnEntityDestroy(int entityID)
-		{
-			UnrelateAll(entityID);
 		}
 
 		private IndexableSet<int> AcquireHashSetFromPool()

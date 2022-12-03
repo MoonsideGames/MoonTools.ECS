@@ -5,41 +5,42 @@ namespace MoonTools.ECS
 {
 	public struct FilterBuilder
 	{
-		private ComponentDepot ComponentDepot;
-		private HashSet<Type> Included;
-		private HashSet<Type> Excluded;
+		private TypeIndices ComponentTypeIndices;
+		private FilterStorage FilterStorage;
+		private HashSet<int> Included;
+		private HashSet<int> Excluded;
 
-		internal FilterBuilder(ComponentDepot componentDepot)
+		internal FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices)
 		{
-			ComponentDepot = componentDepot;
-			Included = new HashSet<Type>();
-			Excluded = new HashSet<Type>();
+			FilterStorage = filterStorage;
+			ComponentTypeIndices = componentTypeIndices;
+			Included = new HashSet<int>();
+			Excluded = new HashSet<int>();
 		}
 
-		private FilterBuilder(ComponentDepot componentDepot, HashSet<Type> included, HashSet<Type> excluded)
+		private FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices, HashSet<int> included, HashSet<int> excluded)
 		{
-			ComponentDepot = componentDepot;
+			FilterStorage = filterStorage;
+			ComponentTypeIndices = componentTypeIndices;
 			Included = included;
 			Excluded = excluded;
 		}
 
 		public FilterBuilder Include<TComponent>() where TComponent : unmanaged
 		{
-			ComponentDepot.Register<TComponent>();
-			Included.Add(typeof(TComponent));
-			return new FilterBuilder(ComponentDepot, Included, Excluded);
+			Included.Add(ComponentTypeIndices.GetIndex<TComponent>());
+			return new FilterBuilder(FilterStorage, ComponentTypeIndices, Included, Excluded);
 		}
 
 		public FilterBuilder Exclude<TComponent>() where TComponent : unmanaged
 		{
-			ComponentDepot.Register<TComponent>();
-			Excluded.Add(typeof(TComponent));
-			return new FilterBuilder(ComponentDepot, Included, Excluded);
+			Excluded.Add(ComponentTypeIndices.GetIndex<TComponent>());
+			return new FilterBuilder(FilterStorage, ComponentTypeIndices, Included, Excluded);
 		}
 
 		public Filter Build()
 		{
-			return ComponentDepot.CreateFilter(Included, Excluded);
+			return FilterStorage.CreateFilter(Included, Excluded);
 		}
 	}
 }

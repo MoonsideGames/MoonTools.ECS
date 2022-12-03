@@ -9,7 +9,10 @@ namespace MoonTools.ECS
 		internal EntityStorage EntityStorage => World.EntityStorage;
 		internal ComponentDepot ComponentDepot => World.ComponentDepot;
 		internal RelationDepot RelationDepot => World.RelationDepot;
-		protected FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
+		protected FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
+		internal FilterStorage FilterStorage => World.FilterStorage;
+		internal TypeIndices ComponentTypeIndices => World.ComponentTypeIndices;
+		internal TypeIndices RelationTypeIndices => World.RelationTypeIndices;
 
 		public EntityComponentReader(World world)
 		{
@@ -23,7 +26,8 @@ namespace MoonTools.ECS
 
 		protected bool Has<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
-			return ComponentDepot.Has<TComponent>(entity.ID);
+			var storageIndex = ComponentTypeIndices.GetIndex<TComponent>();
+			return EntityStorage.HasComponent(entity.ID, storageIndex);
 		}
 
 		protected bool Some<TComponent>() where TComponent : unmanaged
@@ -38,7 +42,7 @@ namespace MoonTools.ECS
 
 		protected ref readonly TComponent GetSingleton<TComponent>() where TComponent : unmanaged
 		{
-			return ref ComponentDepot.Get<TComponent>();
+			return ref ComponentDepot.GetFirst<TComponent>();
 		}
 
 		protected Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged

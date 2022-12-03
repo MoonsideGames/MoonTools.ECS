@@ -1,27 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
 	public class Filter
 	{
 		internal FilterSignature Signature;
-		private ComponentDepot ComponentDepot;
+		private FilterStorage FilterStorage;
 
-		internal Filter(ComponentDepot componentDepot, HashSet<Type> included, HashSet<Type> excluded)
+		internal Filter(FilterStorage filterStorage, HashSet<int> included, HashSet<int> excluded)
 		{
-			ComponentDepot = componentDepot;
+			FilterStorage = filterStorage;
 			Signature = new FilterSignature(included, excluded);
 		}
 
-		public IEnumerable<Entity> Entities => ComponentDepot.FilterEntities(this);
-		public IEnumerable<Entity> EntitiesInRandomOrder => ComponentDepot.FilterEntitiesRandom(this);
-		public Entity RandomEntity => ComponentDepot.FilterRandomEntity(this);
+		public IEnumerable<Entity> Entities => FilterStorage.FilterEntities(Signature);
+		public IEnumerable<Entity> EntitiesInRandomOrder => FilterStorage.FilterEntitiesRandom(Signature);
+		public Entity RandomEntity => FilterStorage.FilterRandomEntity(Signature);
 
-		public int Count => ComponentDepot.FilterCount(this);
+		public int Count => FilterStorage.FilterCount(Signature);
 		public bool Empty => Count == 0;
 
 		// WARNING: this WILL crash if the index is out of range!
-		public Entity NthEntity(int index) => ComponentDepot.FilterNthEntity(this, index);
+		public Entity NthEntity(int index) => FilterStorage.FilterNthEntity(Signature, index);
 	}
 }

@@ -6,12 +6,14 @@ namespace MoonTools.ECS
 {
 	internal abstract class ComponentStorage
 	{
-		public abstract bool Has(int entityID);
 		public abstract bool Remove(int entityID);
-		public abstract object Debug_Get(int entityID);
 		public abstract ComponentStorageState CreateState();
 		public abstract void Save(ComponentStorageState state);
 		public abstract void Load(ComponentStorageState state);
+
+#if DEBUG
+		public abstract object Debug_Get(int entityID);
+#endif
 	}
 
 	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
@@ -26,22 +28,12 @@ namespace MoonTools.ECS
 			return nextID > 0;
 		}
 
-		public override bool Has(int entityID)
-		{
-			return entityIDToStorageIndex.ContainsKey(entityID);
-		}
-
 		public ref readonly TComponent Get(int entityID)
 		{
 			return ref components[entityIDToStorageIndex[entityID]];
 		}
 
-		public override object Debug_Get(int entityID)
-		{
-			return components[entityIDToStorageIndex[entityID]];
-		}
-
-		public ref readonly TComponent Get()
+		public ref readonly TComponent GetFirst()
 		{
 #if DEBUG
 			if (nextID == 0)
@@ -52,11 +44,8 @@ namespace MoonTools.ECS
 			return ref components[0];
 		}
 
-		// Returns true if the entity already had this component.
-		public bool Set(int entityID, in TComponent component)
+		public void Set(int entityID, in TComponent component)
 		{
-			bool result = true;
-
 			if (!entityIDToStorageIndex.ContainsKey(entityID))
 			{
 				var index = nextID;
@@ -70,13 +59,9 @@ namespace MoonTools.ECS
 
 				entityIDToStorageIndex[entityID] = index;
 				entityIDs[index] = entityID;
-
-				result = false;
 			}
 
 			components[entityIDToStorageIndex[entityID]] = component;
-
-			return result;
 		}
 
 		// Returns true if the entity had this component.
@@ -166,5 +151,12 @@ namespace MoonTools.ECS
 
 			nextID = state.Count;
 		}
+
+#if DEBUG
+		public override object Debug_Get(int entityID)
+		{
+			return components[entityIDToStorageIndex[entityID]];
+		}
+#endif
 	}
 }

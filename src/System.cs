@@ -25,12 +25,21 @@ namespace MoonTools.ECS
 				throw new ArgumentException("This entity is not valid!");
 			}
 #endif
+			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
+			{
+				FilterStorage.Check<TComponent>(entity.ID);
+			}
+
 			ComponentDepot.Set<TComponent>(entity.ID, component);
 		}
 
 		protected void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
-			ComponentDepot.Remove<TComponent>(entity.ID);
+			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
+			{
+				ComponentDepot.Remove<TComponent>(entity.ID);
+				FilterStorage.Check<TComponent>(entity.ID);
+			}
 		}
 
 		protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : unmanaged
@@ -71,23 +80,45 @@ namespace MoonTools.ECS
 		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
 		{
 			RelationDepot.Set<TRelationKind>(new Relation(entityA, entityB), relationData);
+			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
+			EntityStorage.AddRelation(entityA.ID, relationTypeIndex);
+			EntityStorage.AddRelation(entityB.ID, relationTypeIndex);
 		}
 
 		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{
-			RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
+			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
+
+			if (aEmpty)
+			{
+				EntityStorage.RemoveRelation(entityA.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+			}
+
+			if (bEmpty)
+			{
+				EntityStorage.RemoveRelation(entityB.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+			}
 		}
 
 		protected void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			RelationDepot.UnrelateAll<TRelationKind>(entity.ID);
+			EntityStorage.RemoveRelation(entity.ID, RelationTypeIndices.GetIndex<TRelationKind>());
 		}
 
-		// FIXME: this is insanely inefficient
 		protected void Destroy(in Entity entity)
 		{
-			ComponentDepot.OnEntityDestroy(entity.ID);
-			RelationDepot.OnEntityDestroy(entity.ID);
+			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+			{
+				ComponentDepot.Remove(entity.ID, componentTypeIndex);
+				FilterStorage.RemoveEntity(entity.ID, componentTypeIndex);
+			}
+
+			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
+			{
+				RelationDepot.UnrelateAll(entity.ID, relationTypeIndex);
+			}
+
 			EntityStorage.Destroy(entity);
 		}
 	}

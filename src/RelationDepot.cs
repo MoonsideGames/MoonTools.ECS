@@ -6,21 +6,34 @@ namespace MoonTools.ECS
 {
 	internal class RelationDepot
 	{
-		private Dictionary<Type, RelationStorage> storages = new Dictionary<Type, RelationStorage>();
+		private TypeIndices RelationTypeIndices;
+		private RelationStorage[] storages = new RelationStorage[256];
 
-		private void Register<TRelationKind>() where TRelationKind : unmanaged
+		public RelationDepot(TypeIndices relationTypeIndices)
 		{
-			if (!storages.ContainsKey(typeof(TRelationKind)))
+			RelationTypeIndices = relationTypeIndices;
+		}
+
+		private void Register<TRelationKind>(int index) where TRelationKind : unmanaged
+		{
+			if (index >= storages.Length)
 			{
-				storages.Add(typeof(TRelationKind), new RelationStorage<TRelationKind>());
+				Array.Resize(ref storages, storages.Length * 2);
 			}
+
+			storages[index] = new RelationStorage<TRelationKind>();
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : unmanaged
 		{
-			Register<TRelationKind>();
-			return (RelationStorage<TRelationKind>) storages[typeof(TRelationKind)];
+			var storageIndex = RelationTypeIndices.GetIndex<TRelationKind>();
+			// TODO: is there some way to avoid this null check?
+			if (storages[storageIndex] == null)
+			{
+				Register<TRelationKind>(storageIndex);
+			}
+			return (RelationStorage<TRelationKind>) storages[storageIndex];
 		}
 
 		public void Set<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : unmanaged
@@ -28,9 +41,9 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().Set(relation, relationData);
 		}
 
-		public void Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
+		public (bool, bool) Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
 		{
-			Lookup<TRelationKind>().Remove(relation);
+			return Lookup<TRelationKind>().Remove(relation);
 		}
 
 		public void UnrelateAll<TRelationKind>(int entityID) where TRelationKind : unmanaged
@@ -38,13 +51,9 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().UnrelateAll(entityID);
 		}
 
-		// FIXME: optimize this
-		public void OnEntityDestroy(int entityID)
+		public void UnrelateAll(int entityID, int relationStorageIndex)
 		{
-			foreach (var storage in storages.Values)
-			{
-				storage.OnEntityDestroy(entityID);
-			}
+			storages[relationStorageIndex].UnrelateAll(entityID);
 		}
 
 		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
@@ -95,27 +104,6 @@ namespace MoonTools.ECS
 		public int InRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelationCount(entityID);
-		}
-
-		public void Save(RelationDepotState state)
-		{
-			foreach (var (type, storage) in storages)
-			{
-				if (!state.StorageStates.ContainsKey(type))
-				{
-					state.StorageStates.Add(type, storage.CreateState());
-				}
-
-				storage.Save(state.StorageStates[type]);
-			}
-		}
-
-		public void Load(RelationDepotState state)
-		{
-			foreach (var (type, storageState) in state.StorageStates)
-			{
-				storages[type].Load(storageState);
-			}
 		}
 	}
 }

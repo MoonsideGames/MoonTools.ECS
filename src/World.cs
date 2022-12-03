@@ -2,10 +2,25 @@
 {
 	public class World
 	{
+		internal readonly TypeIndices ComponentTypeIndices = new TypeIndices();
+		internal readonly TypeIndices RelationTypeIndices = new TypeIndices();
 		internal readonly EntityStorage EntityStorage = new EntityStorage();
-		internal readonly ComponentDepot ComponentDepot = new ComponentDepot();
+		internal readonly ComponentDepot ComponentDepot;
 		internal readonly MessageDepot MessageDepot = new MessageDepot();
-		internal readonly RelationDepot RelationDepot = new RelationDepot();
+		internal readonly RelationDepot RelationDepot;
+		internal readonly FilterStorage FilterStorage;
+
+		/*
+		internal readonly TemplateStorage TemplateStorage = new TemplateStorage();
+		internal readonly ComponentDepot TemplateComponentDepot = new ComponentDepot();
+		*/
+
+		public World()
+		{
+			ComponentDepot = new ComponentDepot(ComponentTypeIndices);
+			RelationDepot = new RelationDepot(RelationTypeIndices);
+			FilterStorage = new FilterStorage(EntityStorage, ComponentTypeIndices);
+		}
 
 		public Entity CreateEntity()
 		{
@@ -14,7 +29,31 @@
 
 		public void Set<TComponent>(Entity entity, in TComponent component) where TComponent : unmanaged
 		{
-			ComponentDepot.Set(entity.ID, component);
+			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
+			{
+				FilterStorage.Check<TComponent>(entity.ID);
+			}
+
+			ComponentDepot.Set<TComponent>(entity.ID, component);
+		}
+
+		/*
+		public Template CreateTemplate()
+		{
+			return TemplateStorage.Create();
+		}
+
+		public void Set<TComponent>(Template template, in TComponent component) where TComponent : unmanaged
+		{
+			TemplateComponentDepot.Set(template.ID, component);
+		}
+		*/
+
+		public Entity Instantiate(Template template)
+		{
+			var entity = EntityStorage.Create();
+
+			return entity;
 		}
 
 		public void Send<TMessage>(in TMessage message) where TMessage : unmanaged
@@ -27,28 +66,9 @@
 			MessageDepot.Clear();
 		}
 
-		public void DisableSerialization<TComponent>() where TComponent : unmanaged
-		{
-			ComponentDepot.DisableSerialization<TComponent>();
-		}
-
 		public WorldState CreateState()
 		{
 			return new WorldState();
-		}
-
-		public void Save(WorldState state)
-		{
-			ComponentDepot.Save(state.ComponentDepotState);
-			EntityStorage.Save(state.EntityStorageState);
-			RelationDepot.Save(state.RelationDepotState);
-		}
-
-		public void Load(WorldState state)
-		{
-			ComponentDepot.Load(state.ComponentDepotState);
-			EntityStorage.Load(state.EntityStorageState);
-			RelationDepot.Load(state.RelationDepotState);
 		}
 	}
 }

@@ -15,7 +15,7 @@ namespace MoonTools.ECS
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private void Register<TComponent>(int index) where TComponent : unmanaged
+		internal void Register<TComponent>(int index) where TComponent : unmanaged
 		{
 			if (index >= storages.Length)
 			{
@@ -47,12 +47,11 @@ namespace MoonTools.ECS
 			return ref Lookup<TComponent>().Get(entityID);
 		}
 
-#if DEBUG
-		public object Debug_Get(int entityID, int componentTypeIndex)
+		// used for debugging and template instantiation
+		internal object UntypedGet(int entityID, int componentTypeIndex)
 		{
-			return storages[componentTypeIndex].Debug_Get(entityID);
+			return storages[componentTypeIndex].UntypedGet(entityID);
 		}
-#endif
 
 		public ref readonly TComponent GetFirst<TComponent>() where TComponent : unmanaged
 		{
@@ -62,6 +61,11 @@ namespace MoonTools.ECS
 		public void Set<TComponent>(int entityID, in TComponent component) where TComponent : unmanaged
 		{
 			Lookup<TComponent>().Set(entityID, component);
+		}
+
+		internal void Set(int entityID, int componentTypeIndex, object component)
+		{
+			storages[componentTypeIndex].Set(entityID, component);
 		}
 
 		public Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged

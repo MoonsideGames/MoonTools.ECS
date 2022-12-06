@@ -33,20 +33,20 @@ namespace MoonTools.ECS
 		}
 
 		// Returns true if the component is new.
-		public bool SetComponent(int entityID, int storageIndex)
+		public bool SetComponent(int entityID, int componentTypeIndex)
 		{
-			return EntityToComponentTypeIndices[entityID].Add(storageIndex);
+			return EntityToComponentTypeIndices[entityID].Add(componentTypeIndex);
 		}
 
-		public bool HasComponent(int entityID, int storageIndex)
+		public bool HasComponent(int entityID, int componentTypeIndex)
 		{
-			return EntityToComponentTypeIndices[entityID].Contains(storageIndex);
+			return EntityToComponentTypeIndices[entityID].Contains(componentTypeIndex);
 		}
 
 		// Returns true if the component existed.
-		public bool RemoveComponent(int entityID, int storageIndex)
+		public bool RemoveComponent(int entityID, int componentTypeIndex)
 		{
-			return EntityToComponentTypeIndices[entityID].Remove(storageIndex);
+			return EntityToComponentTypeIndices[entityID].Remove(componentTypeIndex);
 		}
 
 		public void AddRelation(int entityID, int relationIndex)

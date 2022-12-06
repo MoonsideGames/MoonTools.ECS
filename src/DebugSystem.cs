@@ -9,9 +9,7 @@ namespace MoonTools.ECS
 {
 	public abstract class DebugSystem : System
 	{
-#if DEBUG
 		private Dictionary<Type, Filter> singleComponentFilters = new Dictionary<Type, Filter>();
-#endif
 
 		protected DebugSystem(World world) : base(world)
 		{
@@ -21,7 +19,7 @@ namespace MoonTools.ECS
 		{
 			foreach (var typeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
 			{
-				yield return ComponentDepot.Debug_Get(entity.ID, typeIndex);
+				yield return ComponentDepot.UntypedGet(entity.ID, typeIndex);
 			}
 		}
 

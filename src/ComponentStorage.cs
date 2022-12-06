@@ -6,14 +6,14 @@ namespace MoonTools.ECS
 {
 	internal abstract class ComponentStorage
 	{
+		internal abstract void Set(int entityID, object component);
 		public abstract bool Remove(int entityID);
 		public abstract ComponentStorageState CreateState();
 		public abstract void Save(ComponentStorageState state);
 		public abstract void Load(ComponentStorageState state);
 
-#if DEBUG
-		public abstract object Debug_Get(int entityID);
-#endif
+		// used for debugging and template instantiation
+		internal abstract object UntypedGet(int entityID);
 	}
 
 	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
@@ -31,6 +31,11 @@ namespace MoonTools.ECS
 		public ref readonly TComponent Get(int entityID)
 		{
 			return ref components[entityIDToStorageIndex[entityID]];
+		}
+
+		internal override object UntypedGet(int entityID)
+		{
+			return components[entityIDToStorageIndex[entityID]];
 		}
 
 		public ref readonly TComponent GetFirst()
@@ -62,6 +67,11 @@ namespace MoonTools.ECS
 			}
 
 			components[entityIDToStorageIndex[entityID]] = component;
+		}
+
+		internal override void Set(int entityID, object component)
+		{
+			Set(entityID, (TComponent) component);
 		}
 
 		// Returns true if the entity had this component.
@@ -151,12 +161,5 @@ namespace MoonTools.ECS
 
 			nextID = state.Count;
 		}
-
-#if DEBUG
-		public override object Debug_Get(int entityID)
-		{
-			return components[entityIDToStorageIndex[entityID]];
-		}
-#endif
 	}
 }

@@ -42,6 +42,28 @@ namespace MoonTools.ECS
 			}
 		}
 
+		protected void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged
+		{
+			var componentTypeIndex = ComponentTypeIndices.GetIndex<TComponent>();
+			TemplateStorage.SetComponent(template.ID, componentTypeIndex);
+			TemplateComponentDepot.Set(template.ID, component);
+			ComponentDepot.Register<TComponent>(componentTypeIndex);
+		}
+
+		protected Entity Instantiate(in Template template)
+		{
+			var entity = EntityStorage.Create();
+
+			foreach (var componentTypeIndex in TemplateStorage.ComponentTypeIndices(template.ID))
+			{
+				EntityStorage.SetComponent(entity.ID, componentTypeIndex);
+				FilterStorage.Check(entity.ID, componentTypeIndex);
+				ComponentDepot.Set(entity.ID, componentTypeIndex, TemplateComponentDepot.UntypedGet(template.ID, componentTypeIndex));
+			}
+
+			return entity;
+		}
+
 		protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : unmanaged
 		{
 			return MessageDepot.All<TMessage>();

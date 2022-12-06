@@ -84,32 +84,5 @@ namespace MoonTools.ECS
 		{
 			Count = 0;
 		}
-
-		public void Save(IndexableSetState<T> state)
-		{
-			ReadOnlySpan<byte> arrayBytes = MemoryMarshal.Cast<T, byte>(array);
-
-			if (arrayBytes.Length > state.Array.Length)
-			{
-				Array.Resize(ref state.Array, arrayBytes.Length);
-			}
-
-			arrayBytes.CopyTo(state.Array);
-
-			state.Count = Count;
-		}
-
-		public void Load(IndexableSetState<T> state)
-		{
-			state.Array.CopyTo(MemoryMarshal.Cast<T, byte>(array));
-
-			indices.Clear();
-			for (var i = 0; i < state.Count; i += 1)
-			{
-				indices[array[i]] = i;
-			}
-
-			Count = state.Count;
-		}
 	}
 }

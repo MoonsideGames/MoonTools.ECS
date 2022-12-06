@@ -7,6 +7,7 @@ namespace MoonTools.ECS
 	{
 		Dictionary<Type, int> TypeToIndex = new Dictionary<Type, int>();
 		int nextID = 0;
+		public int Count => TypeToIndex.Count;
 
 		public int GetIndex<T>() where T : unmanaged
 		{
@@ -23,6 +24,7 @@ namespace MoonTools.ECS
 		{
 			return TypeToIndex[type];
 		}
+
 
 #if DEBUG
 		public IEnumerable<Type> Types => TypeToIndex.Keys;

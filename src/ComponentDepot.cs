@@ -87,5 +87,28 @@ namespace MoonTools.ECS
 		{
 			Lookup<TComponent>().Remove(entityID);
 		}
+
+		public void Clear()
+		{
+			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
+			{
+				if (storages[i] != null)
+				{
+					storages[i].Clear();
+				}
+			}
+		}
+
+		// used to fill snapshot depot with correct storages
+		public void FillMissingStorages(ComponentDepot other)
+		{
+			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
+			{
+				if (storages[i] == null && other.storages[i] != null)
+				{
+					storages[i] = other.storages[i].CreateStorage();
+				}
+			}
+		}
 	}
 }

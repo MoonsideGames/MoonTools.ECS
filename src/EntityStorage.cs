@@ -7,10 +7,13 @@ namespace MoonTools.ECS
 		private int nextID = 0;
 		// FIXME: why is this duplicated?
 		private readonly Stack<int> availableIDs = new Stack<int>();
+		// FIXME: this is only needed in debug mode
 		private readonly HashSet<int> availableIDHash = new HashSet<int>();
 
 		private Dictionary<int, HashSet<int>> EntityToComponentTypeIndices = new Dictionary<int, HashSet<int>>();
 		private Dictionary<int, HashSet<int>> EntityToRelationTypeIndices = new Dictionary<int, HashSet<int>>();
+
+		public int Count => nextID - availableIDs.Count;
 
 		public Entity Create()
 		{
@@ -68,6 +71,21 @@ namespace MoonTools.ECS
 		public IEnumerable<int> RelationTypeIndices(int entityID)
 		{
 			return EntityToRelationTypeIndices[entityID];
+		}
+
+		public void Clear()
+		{
+			nextID = 0;
+			foreach (var componentSet in EntityToComponentTypeIndices.Values)
+			{
+				componentSet.Clear();
+			}
+			foreach (var relationSet in EntityToRelationTypeIndices.Values)
+			{
+				relationSet.Clear();
+			}
+			availableIDs.Clear();
+			availableIDHash.Clear();
 		}
 
 		private int NextID()

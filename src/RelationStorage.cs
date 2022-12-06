@@ -6,9 +6,6 @@ namespace MoonTools.ECS
 {
 	internal abstract class RelationStorage
 	{
-		public abstract RelationStorageState CreateState();
-		public abstract void Save(RelationStorageState state);
-		public abstract void Load(RelationStorageState state);
 		public abstract void UnrelateAll(int entityID);
 	}
 
@@ -227,61 +224,6 @@ namespace MoonTools.ECS
 		{
 			hashSet.Clear();
 			listPool.Push(hashSet);
-		}
-
-		public override RelationStorageState CreateState()
-		{
-			return RelationStorageState.Create<TRelation>(count);
-		}
-
-		public override void Save(RelationStorageState state)
-		{
-			ReadOnlySpan<byte> relationBytes = MemoryMarshal.Cast<Relation, byte>(relations);
-
-			if (relationBytes.Length > state.Relations.Length)
-			{
-				Array.Resize(ref state.Relations, relationBytes.Length);
-			}
-			relationBytes.CopyTo(state.Relations);
-
-			ReadOnlySpan<byte> relationDataBytes = MemoryMarshal.Cast<TRelation, byte>(relationDatas);
-
-			if (relationDataBytes.Length > state.RelationDatas.Length)
-			{
-				Array.Resize(ref state.RelationDatas, relationDataBytes.Length);
-			}
-			relationDataBytes.CopyTo(state.RelationDatas);
-
-			state.Count = count;
-		}
-
-		public override void Load(RelationStorageState state)
-		{
-			state.Relations.CopyTo(MemoryMarshal.Cast<Relation, byte>(relations));
-			state.RelationDatas.CopyTo(MemoryMarshal.Cast<TRelation, byte>(relationDatas));
-
-			indices.Clear();
-			outRelations.Clear();
-			inRelations.Clear();
-			for (var i = 0; i < state.Count; i += 1)
-			{
-				var relation = relations[i];
-				indices[relation] = i;
-
-				if (!outRelations.ContainsKey(relation.A.ID))
-				{
-					outRelations[relation.A.ID] = AcquireHashSetFromPool();
-				}
-				outRelations[relation.A.ID].Add(relation.B.ID);
-
-				if (!inRelations.ContainsKey(relation.B.ID))
-				{
-					inRelations[relation.B.ID] = AcquireHashSetFromPool();
-				}
-				inRelations[relation.B.ID].Add(relation.A.ID);
-			}
-
-			count = state.Count;
 		}
 	}
 }

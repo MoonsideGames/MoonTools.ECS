@@ -1,4 +1,6 @@
-﻿namespace MoonTools.ECS
+﻿using System;
+
+namespace MoonTools.ECS
 {
 	public class World
 	{
@@ -9,10 +11,10 @@
 		internal readonly MessageDepot MessageDepot = new MessageDepot();
 		internal readonly RelationDepot RelationDepot;
 		internal readonly FilterStorage FilterStorage;
+		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
 
 		internal readonly TemplateStorage TemplateStorage = new TemplateStorage();
 		internal readonly ComponentDepot TemplateComponentDepot;
-
 
 		public World()
 		{
@@ -29,6 +31,13 @@
 
 		public void Set<TComponent>(Entity entity, in TComponent component) where TComponent : unmanaged
 		{
+#if DEBUG
+			// check for use after destroy
+			if (!EntityStorage.Exists(entity))
+			{
+				throw new InvalidOperationException("This entity is not valid!");
+			}
+#endif
 			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
 			{
 				FilterStorage.Check<TComponent>(entity.ID);
@@ -44,11 +53,12 @@
 
 		public void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged
 		{
-			TemplateStorage.SetComponent(template.ID, ComponentTypeIndices.GetIndex<TComponent>());
+			var componentTypeIndex = ComponentTypeIndices.GetIndex<TComponent>();
+			TemplateStorage.SetComponent(template.ID, componentTypeIndex);
 			TemplateComponentDepot.Set(template.ID, component);
+			ComponentDepot.Register<TComponent>(componentTypeIndex);
 		}
 
-		// TODO: TEST ME!!!
 		public Entity Instantiate(in Template template)
 		{
 			var entity = EntityStorage.Create();
@@ -68,14 +78,31 @@
 			MessageDepot.Add(message);
 		}
 
+		public void Destroy(in Entity entity)
+		{
+			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+			{
+				ComponentDepot.Remove(entity.ID, componentTypeIndex);
+				FilterStorage.RemoveEntity(entity.ID, componentTypeIndex);
+			}
+
+			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
+			{
+				RelationDepot.UnrelateAll(entity.ID, relationTypeIndex);
+			}
+
+			EntityStorage.Destroy(entity);
+		}
+
+
 		public void FinishUpdate()
 		{
 			MessageDepot.Clear();
 		}
 
-		public WorldState CreateState()
+		public Snapshot CreateSnapshot()
 		{
-			return new WorldState();
+			return new Snapshot(this);
 		}
 	}
 }

@@ -52,11 +52,6 @@ namespace MoonTools.ECS
 			return ComponentDepot.GetSingletonEntity<TComponent>();
 		}
 
-		protected bool Exists(in Entity entity)
-		{
-			return EntityStorage.Exists(entity);
-		}
-
 		protected IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return RelationDepot.Relations<TRelationKind>();

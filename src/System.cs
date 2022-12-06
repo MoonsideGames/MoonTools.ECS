@@ -11,27 +11,9 @@ namespace MoonTools.ECS
 
 		public abstract void Update(TimeSpan delta);
 
-		protected Entity CreateEntity()
-		{
-			return EntityStorage.Create();
-		}
+		protected Entity CreateEntity() => World.CreateEntity();
 
-		protected void Set<TComponent>(in Entity entity, in TComponent component) where TComponent : unmanaged
-		{
-#if DEBUG
-			// check for use after destroy
-			if (!Exists(entity))
-			{
-				throw new ArgumentException("This entity is not valid!");
-			}
-#endif
-			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
-			{
-				FilterStorage.Check<TComponent>(entity.ID);
-			}
-
-			ComponentDepot.Set<TComponent>(entity.ID, component);
-		}
+		protected void Set<TComponent>(in Entity entity, in TComponent component) where TComponent : unmanaged => World.Set<TComponent>(entity, component);
 
 		protected void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
@@ -42,27 +24,9 @@ namespace MoonTools.ECS
 			}
 		}
 
-		protected void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged
-		{
-			var componentTypeIndex = ComponentTypeIndices.GetIndex<TComponent>();
-			TemplateStorage.SetComponent(template.ID, componentTypeIndex);
-			TemplateComponentDepot.Set(template.ID, component);
-			ComponentDepot.Register<TComponent>(componentTypeIndex);
-		}
+		protected void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged => World.Set<TComponent>(template, component);
 
-		protected Entity Instantiate(in Template template)
-		{
-			var entity = EntityStorage.Create();
-
-			foreach (var componentTypeIndex in TemplateStorage.ComponentTypeIndices(template.ID))
-			{
-				EntityStorage.SetComponent(entity.ID, componentTypeIndex);
-				FilterStorage.Check(entity.ID, componentTypeIndex);
-				ComponentDepot.Set(entity.ID, componentTypeIndex, TemplateComponentDepot.UntypedGet(template.ID, componentTypeIndex));
-			}
-
-			return entity;
-		}
+		protected Entity Instantiate(in Template template) => World.Instantiate(template);
 
 		protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : unmanaged
 		{
@@ -128,20 +92,6 @@ namespace MoonTools.ECS
 			EntityStorage.RemoveRelation(entity.ID, RelationTypeIndices.GetIndex<TRelationKind>());
 		}
 
-		protected void Destroy(in Entity entity)
-		{
-			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
-			{
-				ComponentDepot.Remove(entity.ID, componentTypeIndex);
-				FilterStorage.RemoveEntity(entity.ID, componentTypeIndex);
-			}
-
-			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
-			{
-				RelationDepot.UnrelateAll(entity.ID, relationTypeIndex);
-			}
-
-			EntityStorage.Destroy(entity);
-		}
+		protected void Destroy(in Entity entity) => World.Destroy(entity);
 	}
 }

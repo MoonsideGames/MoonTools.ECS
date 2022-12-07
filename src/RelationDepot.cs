@@ -51,11 +51,6 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().UnrelateAll(entityID);
 		}
 
-		public void UnrelateAll(int entityID, int relationStorageIndex)
-		{
-			storages[relationStorageIndex].UnrelateAll(entityID);
-		}
-
 		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().All();
@@ -104,6 +99,50 @@ namespace MoonTools.ECS
 		public int InRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelationCount(entityID);
+		}
+
+		// untyped methods used for destroying and snapshots
+
+		public void Set(int entityA, int entityB, int relationTypeIndex, object relationData)
+		{
+			storages[relationTypeIndex].Set(entityA, entityB, relationData);
+		}
+
+		public void UnrelateAll(int entityID, int relationTypeIndex)
+		{
+			storages[relationTypeIndex].UnrelateAll(entityID);
+		}
+
+		public IEnumerable<(int, object)> InRelations(int entityID, int relationTypeIndex)
+		{
+			return storages[relationTypeIndex].UntypedInRelations(entityID);
+		}
+
+		public IEnumerable<(int, object)> OutRelations(int entityID, int relationTypeIndex)
+		{
+			return storages[relationTypeIndex].UntypedOutRelations(entityID);
+		}
+
+		public void Clear()
+		{
+			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
+			{
+				if (storages[i] != null)
+				{
+					storages[i].Clear();
+				}
+			}
+		}
+
+		public void CreateMissingStorages(RelationDepot other)
+		{
+			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
+			{
+				if (storages[i] == null && other.storages[i] != null)
+				{
+					storages[i] = other.storages[i].CreateStorage();
+				}
+			}
 		}
 	}
 }

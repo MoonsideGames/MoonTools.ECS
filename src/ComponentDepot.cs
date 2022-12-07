@@ -47,12 +47,6 @@ namespace MoonTools.ECS
 			return ref Lookup<TComponent>().Get(entityID);
 		}
 
-		// used for debugging and template instantiation
-		internal object UntypedGet(int entityID, int componentTypeIndex)
-		{
-			return storages[componentTypeIndex].UntypedGet(entityID);
-		}
-
 		public ref readonly TComponent GetFirst<TComponent>() where TComponent : unmanaged
 		{
 			return ref Lookup<TComponent>().GetFirst();
@@ -63,10 +57,7 @@ namespace MoonTools.ECS
 			Lookup<TComponent>().Set(entityID, component);
 		}
 
-		internal void Set(int entityID, int componentTypeIndex, object component)
-		{
-			storages[componentTypeIndex].Set(entityID, component);
-		}
+
 
 		public Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
 		{
@@ -99,8 +90,21 @@ namespace MoonTools.ECS
 			}
 		}
 
-		// used to fill snapshot depot with correct storages
-		public void FillMissingStorages(ComponentDepot other)
+		// these methods used to implement snapshots, templates, and debugging
+
+		// FIXME: use unsafe pointers instead of object
+		internal object UntypedGet(int entityID, int componentTypeIndex)
+		{
+			return storages[componentTypeIndex].UntypedGet(entityID);
+		}
+
+		// FIXME: use unsafe pointers instead of object
+		internal void Set(int entityID, int componentTypeIndex, object component)
+		{
+			storages[componentTypeIndex].Set(entityID, component);
+		}
+
+		public void CreateMissingStorages(ComponentDepot other)
 		{
 			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
 			{

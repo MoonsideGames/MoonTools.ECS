@@ -67,8 +67,8 @@ namespace MoonTools.ECS
 		{
 			RelationDepot.Set<TRelationKind>(new Relation(entityA, entityB), relationData);
 			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
-			EntityStorage.AddRelation(entityA.ID, relationTypeIndex);
-			EntityStorage.AddRelation(entityB.ID, relationTypeIndex);
+			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
+			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
 		}
 
 		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged

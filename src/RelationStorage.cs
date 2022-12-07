@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
 	internal abstract class RelationStorage
 	{
+		public abstract void Set(int entityA, int entityB, object relationData);
 		public abstract void UnrelateAll(int entityID);
+		public abstract IEnumerable<(int, object)> UntypedInRelations(int entityID);
+		public abstract IEnumerable<(int, object)> UntypedOutRelations(int entityID);
+		// used to create correctly typed storage on snapshot
+		public abstract RelationStorage CreateStorage();
+		public abstract void Clear();
 	}
 
 	// Relation is the two entities, A related to B.
@@ -185,6 +190,29 @@ namespace MoonTools.ECS
 			return (aEmpty, bEmpty);
 		}
 
+		private IndexableSet<int> AcquireHashSetFromPool()
+		{
+			if (listPool.Count == 0)
+			{
+				listPool.Push(new IndexableSet<int>());
+			}
+
+			return listPool.Pop();
+		}
+
+		private void ReturnHashSetToPool(IndexableSet<int> hashSet)
+		{
+			hashSet.Clear();
+			listPool.Push(hashSet);
+		}
+
+		// untyped methods used for internal implementation
+
+		public override void Set(int entityA, int entityB, object relationData)
+		{
+			Set(new Relation(entityA, entityB), (TRelation) relationData);
+		}
+
 		public override void UnrelateAll(int entityID)
 		{
 			if (outRelations.ContainsKey(entityID))
@@ -210,20 +238,43 @@ namespace MoonTools.ECS
 			}
 		}
 
-		private IndexableSet<int> AcquireHashSetFromPool()
+		public override IEnumerable<(int, object)> UntypedInRelations(int entityID)
 		{
-			if (listPool.Count == 0)
+			foreach (var (entity, relationData) in InRelations(entityID))
 			{
-				listPool.Push(new IndexableSet<int>());
+				yield return (entity.ID, relationData);
 			}
-
-			return listPool.Pop();
 		}
 
-		private void ReturnHashSetToPool(IndexableSet<int> hashSet)
+		public override IEnumerable<(int, object)> UntypedOutRelations(int entityID)
 		{
-			hashSet.Clear();
-			listPool.Push(hashSet);
+			foreach (var (entity, relationData) in OutRelations(entityID))
+			{
+				yield return (entity.ID, relationData);
+			}
+		}
+
+		public override RelationStorage<TRelation> CreateStorage()
+		{
+			return new RelationStorage<TRelation>();
+		}
+
+		public override void Clear()
+		{
+			count = 0;
+			indices.Clear();
+
+			foreach (var set in inRelations.Values)
+			{
+				ReturnHashSetToPool(set);
+			}
+			inRelations.Clear();
+
+			foreach (var set in outRelations.Values)
+			{
+				ReturnHashSetToPool(set);
+			}
+			outRelations.Clear();
 		}
 	}
 }

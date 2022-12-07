@@ -52,7 +52,7 @@ namespace MoonTools.ECS
 			return EntityToComponentTypeIndices[entityID].Remove(componentTypeIndex);
 		}
 
-		public void AddRelation(int entityID, int relationIndex)
+		public void AddRelationKind(int entityID, int relationIndex)
 		{
 			EntityToRelationTypeIndices[entityID].Add(relationIndex);
 		}

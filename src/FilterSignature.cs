@@ -24,11 +24,6 @@ namespace MoonTools.ECS
 			return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
 		}
 
-		private int GuidToInt(Guid guid)
-		{
-			return BitConverter.ToInt32(guid.ToByteArray());
-		}
-
 		public override int GetHashCode()
 		{
 			var hashcode = 1;

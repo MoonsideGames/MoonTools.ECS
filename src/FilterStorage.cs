@@ -94,6 +94,27 @@ namespace MoonTools.ECS
 			Check(entityID, ComponentTypeIndices.GetIndex<TComponent>());
 		}
 
+		public bool CheckSatisfied(int entityID, FilterSignature filterSignature)
+		{
+			foreach (var type in filterSignature.Included)
+			{
+				if (!EntityStorage.HasComponent(entityID, type))
+				{
+					return false;
+				}
+			}
+
+			foreach (var type in filterSignature.Excluded)
+			{
+				if (EntityStorage.HasComponent(entityID, type))
+				{
+					return false;
+				}
+			}
+
+			return true;
+		}
+
 		private void CheckFilter(int entityID, FilterSignature filterSignature)
 		{
 			foreach (var type in filterSignature.Included)

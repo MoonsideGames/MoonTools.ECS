@@ -1,19 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
 	internal abstract class ComponentStorage
 	{
-		internal abstract void Set(int entityID, object component);
+		internal abstract unsafe void Set(int entityID, void* component);
 		public abstract bool Remove(int entityID);
 		public abstract void Clear();
 
 		// used for debugging and template instantiation
-		internal abstract object UntypedGet(int entityID);
+		internal abstract unsafe void* UntypedGet(int entityID);
 		// used to create correctly typed storage on snapshot
 		public abstract ComponentStorage CreateStorage();
+#if DEBUG
+		internal abstract object Debug_Get(int entityID);
+		internal abstract IEnumerable<int> Debug_GetEntityIDs();
+#endif
 	}
 
 	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
@@ -33,9 +36,12 @@ namespace MoonTools.ECS
 			return ref components[entityIDToStorageIndex[entityID]];
 		}
 
-		internal override object UntypedGet(int entityID)
+		internal override unsafe void* UntypedGet(int entityID)
 		{
-			return components[entityIDToStorageIndex[entityID]];
+			fixed (void* p = &components[entityIDToStorageIndex[entityID]])
+			{
+				return p;
+			}
 		}
 
 		public ref readonly TComponent GetFirst()
@@ -69,9 +75,9 @@ namespace MoonTools.ECS
 			components[entityIDToStorageIndex[entityID]] = component;
 		}
 
-		internal override void Set(int entityID, object component)
+		internal override unsafe void Set(int entityID, void* component)
 		{
-			Set(entityID, (TComponent) component);
+			Set(entityID, *((TComponent*) component));
 		}
 
 		// Returns true if the entity had this component.
@@ -127,5 +133,17 @@ namespace MoonTools.ECS
 		{
 			return new ComponentStorage<TComponent>();
 		}
+
+#if DEBUG
+		internal override object Debug_Get(int entityID)
+		{
+			return components[entityIDToStorageIndex[entityID]];
+		}
+
+		internal override IEnumerable<int> Debug_GetEntityIDs()
+		{
+			return entityIDToStorageIndex.Keys;
+		}
+#endif
 	}
 }

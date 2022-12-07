@@ -23,7 +23,7 @@ namespace MoonTools.ECS
 			SnapshotRelationDepot = new RelationDepot(World.RelationTypeIndices);
 		}
 
-		public void Take(Filter filter)
+		public unsafe void Take(Filter filter)
 		{
 			Clear();
 			Filter = filter;
@@ -50,7 +50,7 @@ namespace MoonTools.ECS
 				{
 					SnapshotEntityStorage.AddRelationKind(snapshotEntityID, relationTypeIndex);
 
-					foreach (var (otherEntityID, relationData) in World.RelationDepot.OutRelations(worldEntity.ID, relationTypeIndex))
+					foreach (var (otherEntityID, relationStorageIndex) in World.RelationDepot.OutRelationIndices(worldEntity.ID, relationTypeIndex))
 					{
 #if DEBUG
 						if (!World.FilterStorage.CheckSatisfied(otherEntityID, Filter.Signature))
@@ -60,13 +60,13 @@ namespace MoonTools.ECS
 #endif
 						var otherSnapshotID = WorldToSnapshotID[otherEntityID];
 						SnapshotEntityStorage.AddRelationKind(otherSnapshotID, relationTypeIndex);
-						SnapshotRelationDepot.Set(snapshotEntityID, otherSnapshotID, relationTypeIndex, relationData);
+						SnapshotRelationDepot.Set(snapshotEntityID, otherSnapshotID, relationTypeIndex, World.RelationDepot.Get(relationTypeIndex, relationStorageIndex));
 					}
 				}
 			}
 		}
 
-		public void Restore()
+		public unsafe void Restore()
 		{
 			if (Filter == null)
 			{
@@ -99,10 +99,10 @@ namespace MoonTools.ECS
 				{
 					World.EntityStorage.AddRelationKind(worldID, relationTypeIndex);
 
-					foreach (var (otherEntityID, relationData) in SnapshotRelationDepot.OutRelations(i, relationTypeIndex))
+					foreach (var (otherEntityID, relationStorageIndex) in SnapshotRelationDepot.OutRelationIndices(i, relationTypeIndex))
 					{
 						var otherEntityWorldID = SnapshotToWorldID[otherEntityID];
-						World.RelationDepot.Set(worldID, otherEntityWorldID, relationTypeIndex, relationData);
+						World.RelationDepot.Set(worldID, otherEntityWorldID, relationTypeIndex, SnapshotRelationDepot.Get(relationTypeIndex, relationStorageIndex));
 					}
 				}
 			}

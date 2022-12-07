@@ -59,7 +59,7 @@ namespace MoonTools.ECS
 			ComponentDepot.Register<TComponent>(componentTypeIndex);
 		}
 
-		public Entity Instantiate(in Template template)
+		public unsafe Entity Instantiate(in Template template)
 		{
 			var entity = EntityStorage.Create();
 

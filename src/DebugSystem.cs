@@ -9,27 +9,24 @@ namespace MoonTools.ECS
 {
 	public abstract class DebugSystem : System
 	{
-		private Dictionary<Type, Filter> singleComponentFilters = new Dictionary<Type, Filter>();
-
 		protected DebugSystem(World world) : base(world)
 		{
 		}
 
-		protected IEnumerable<object> Debug_GetAllComponents(Entity entity)
+		protected IEnumerable<dynamic> Debug_GetAllComponents(Entity entity)
 		{
 			foreach (var typeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
 			{
-				yield return ComponentDepot.UntypedGet(entity.ID, typeIndex);
+				yield return ComponentDepot.Debug_Get(entity.ID, typeIndex);
 			}
 		}
 
 		protected IEnumerable<Entity> Debug_GetEntities(Type componentType)
 		{
-			if (!singleComponentFilters.ContainsKey(componentType))
+			foreach (var entityID in ComponentDepot.Debug_GetEntityIDs(ComponentTypeIndices.GetIndex(componentType)))
 			{
-				singleComponentFilters.Add(componentType, new Filter(FilterStorage, new HashSet<int>(ComponentTypeIndices.GetIndex(componentType)), new HashSet<int>()));
+				yield return new Entity(entityID);
 			}
-			return singleComponentFilters[componentType].Entities;
 		}
 
 		protected IEnumerable<Type> Debug_SearchComponentType(string typeString)

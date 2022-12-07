@@ -103,9 +103,14 @@ namespace MoonTools.ECS
 
 		// untyped methods used for destroying and snapshots
 
-		public void Set(int entityA, int entityB, int relationTypeIndex, object relationData)
+		public unsafe void Set(int entityA, int entityB, int relationTypeIndex, void* relationData)
 		{
 			storages[relationTypeIndex].Set(entityA, entityB, relationData);
+		}
+
+		public unsafe void* Get(int relationTypeIndex, int relationStorageIndex)
+		{
+			return storages[relationTypeIndex].Get(relationStorageIndex);
 		}
 
 		public void UnrelateAll(int entityID, int relationTypeIndex)
@@ -113,14 +118,9 @@ namespace MoonTools.ECS
 			storages[relationTypeIndex].UnrelateAll(entityID);
 		}
 
-		public IEnumerable<(int, object)> InRelations(int entityID, int relationTypeIndex)
+		public IEnumerable<(int, int)> OutRelationIndices(int entityID, int relationTypeIndex)
 		{
-			return storages[relationTypeIndex].UntypedInRelations(entityID);
-		}
-
-		public IEnumerable<(int, object)> OutRelations(int entityID, int relationTypeIndex)
-		{
-			return storages[relationTypeIndex].UntypedOutRelations(entityID);
+			return storages[relationTypeIndex].OutRelationIndices(entityID);
 		}
 
 		public void Clear()

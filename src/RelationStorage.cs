@@ -5,11 +5,10 @@ namespace MoonTools.ECS
 {
 	internal abstract class RelationStorage
 	{
-		public abstract void Set(int entityA, int entityB, object relationData);
+		public abstract unsafe void Set(int entityA, int entityB, void* relationData);
+		public abstract unsafe void* Get(int relationStorageIndex);
 		public abstract void UnrelateAll(int entityID);
-		public abstract IEnumerable<(int, object)> UntypedInRelations(int entityID);
-		public abstract IEnumerable<(int, object)> UntypedOutRelations(int entityID);
-		// used to create correctly typed storage on snapshot
+		public abstract IEnumerable<(int, int)> OutRelationIndices(int entityID);
 		public abstract RelationStorage CreateStorage();
 		public abstract void Clear();
 	}
@@ -208,9 +207,17 @@ namespace MoonTools.ECS
 
 		// untyped methods used for internal implementation
 
-		public override void Set(int entityA, int entityB, object relationData)
+		public override unsafe void Set(int entityA, int entityB, void* relationData)
 		{
-			Set(new Relation(entityA, entityB), (TRelation) relationData);
+			Set(new Relation(entityA, entityB), *((TRelation*) relationData));
+		}
+
+		public override unsafe void* Get(int relationStorageIndex)
+		{
+			fixed (void* p = &relations[relationStorageIndex])
+			{
+				return p;
+			}
 		}
 
 		public override void UnrelateAll(int entityID)
@@ -238,19 +245,15 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public override IEnumerable<(int, object)> UntypedInRelations(int entityID)
+		public override IEnumerable<(int, int)> OutRelationIndices(int entityID)
 		{
-			foreach (var (entity, relationData) in InRelations(entityID))
+			if (outRelations.ContainsKey(entityID))
 			{
-				yield return (entity.ID, relationData);
-			}
-		}
-
-		public override IEnumerable<(int, object)> UntypedOutRelations(int entityID)
-		{
-			foreach (var (entity, relationData) in OutRelations(entityID))
-			{
-				yield return (entity.ID, relationData);
+				foreach (var id in outRelations[entityID])
+				{
+					var relation = new Relation(entityID, id);
+					yield return (id, indices[relation]);
+				}
 			}
 		}
 

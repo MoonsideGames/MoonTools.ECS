@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace MoonTools.ECS
@@ -57,8 +58,6 @@ namespace MoonTools.ECS
 			Lookup<TComponent>().Set(entityID, component);
 		}
 
-
-
 		public Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
 		{
 			return Lookup<TComponent>().FirstEntity();
@@ -92,14 +91,12 @@ namespace MoonTools.ECS
 
 		// these methods used to implement snapshots, templates, and debugging
 
-		// FIXME: use unsafe pointers instead of object
-		internal object UntypedGet(int entityID, int componentTypeIndex)
+		internal unsafe void* UntypedGet(int entityID, int componentTypeIndex)
 		{
 			return storages[componentTypeIndex].UntypedGet(entityID);
 		}
 
-		// FIXME: use unsafe pointers instead of object
-		internal void Set(int entityID, int componentTypeIndex, object component)
+		internal unsafe void Set(int entityID, int componentTypeIndex, void* component)
 		{
 			storages[componentTypeIndex].Set(entityID, component);
 		}
@@ -114,5 +111,19 @@ namespace MoonTools.ECS
 				}
 			}
 		}
+
+		// this method is used to iterate components of an entity, only for use with a debug inspector
+
+#if DEBUG
+		public object Debug_Get(int entityID, int componentTypeIndex)
+		{
+			return storages[componentTypeIndex].Debug_Get(entityID);
+		}
+
+		public IEnumerable<int> Debug_GetEntityIDs(int componentTypeIndex)
+		{
+			return storages[componentTypeIndex].Debug_GetEntityIDs();
+		}
+#endif
 	}
 }

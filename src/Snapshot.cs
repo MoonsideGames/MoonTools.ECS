@@ -50,18 +50,6 @@ namespace MoonTools.ECS
 				{
 					SnapshotEntityStorage.AddRelationKind(snapshotEntityID, relationTypeIndex);
 
-					foreach (var (otherEntityID, relationData) in World.RelationDepot.InRelations(worldEntity.ID, relationTypeIndex))
-					{
-#if DEBUG
-						if (!World.FilterStorage.CheckSatisfied(otherEntityID, Filter.Signature))
-						{
-							throw new InvalidOperationException($"Snapshot entity {worldEntity.ID} is related to non-snapshot entity {otherEntityID}!");
-						}
-#endif
-						var otherSnapshotID = WorldToSnapshotID[otherEntityID];
-						SnapshotRelationDepot.Set(otherSnapshotID, snapshotEntityID, relationTypeIndex, relationData);
-					}
-
 					foreach (var (otherEntityID, relationData) in World.RelationDepot.OutRelations(worldEntity.ID, relationTypeIndex))
 					{
 #if DEBUG
@@ -71,6 +59,7 @@ namespace MoonTools.ECS
 						}
 #endif
 						var otherSnapshotID = WorldToSnapshotID[otherEntityID];
+						SnapshotEntityStorage.AddRelationKind(otherSnapshotID, relationTypeIndex);
 						SnapshotRelationDepot.Set(snapshotEntityID, otherSnapshotID, relationTypeIndex, relationData);
 					}
 				}
@@ -109,12 +98,6 @@ namespace MoonTools.ECS
 				foreach (var relationTypeIndex in SnapshotEntityStorage.RelationTypeIndices(i))
 				{
 					World.EntityStorage.AddRelationKind(worldID, relationTypeIndex);
-
-					foreach (var (otherEntityID, relationData) in SnapshotRelationDepot.InRelations(i, relationTypeIndex))
-					{
-						var otherEntityWorldID = SnapshotToWorldID[otherEntityID];
-						World.RelationDepot.Set(otherEntityWorldID, worldID, relationTypeIndex, relationData);
-					}
 
 					foreach (var (otherEntityID, relationData) in SnapshotRelationDepot.OutRelations(i, relationTypeIndex))
 					{

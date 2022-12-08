@@ -9,7 +9,7 @@ namespace MoonTools.ECS
 		private Dictionary<T, int> indices;
 		private T[] array;
 		public int Count { get; private set; }
-        public Enumerator GetEnumerator() => new Enumerator(this);
+		public Enumerator GetEnumerator() => new Enumerator(this);
 
 		public IndexableSet(int size = 32)
 		{
@@ -70,41 +70,41 @@ namespace MoonTools.ECS
 		}
 
 		public struct Enumerator
-        {
-            /// <summary>The set being enumerated.</summary>
-            private readonly IndexableSet<T> _set;
-            /// <summary>The next index to yield.</summary>
-            private int _index;
+		{
+			/// <summary>The set being enumerated.</summary>
+			private readonly IndexableSet<T> _set;
+			/// <summary>The next index to yield.</summary>
+			private int _index;
 
-            /// <summary>Initialize the enumerator.</summary>
-            /// <param name="set">The set to enumerate.</param>
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal Enumerator(IndexableSet<T> set)
-            {
+			/// <summary>Initialize the enumerator.</summary>
+			/// <param name="set">The set to enumerate.</param>
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			internal Enumerator(IndexableSet<T> set)
+			{
 				_set = set;
 				_index = _set.Count;
-            }
+			}
 
-            /// <summary>Advances the enumerator to the next element of the span.</summary>
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool MoveNext()
-            {
-                int index = _index - 1;
-                if (index >= 0)
-                {
-                    _index = index;
-                    return true;
-                }
+			/// <summary>Advances the enumerator to the next element of the span.</summary>
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			public bool MoveNext()
+			{
+				int index = _index - 1;
+				if (index >= 0)
+				{
+					_index = index;
+					return true;
+				}
 
-                return false;
-            }
+				return false;
+			}
 
-            /// <summary>Gets the element at the current position of the enumerator.</summary>
-            public T Current
-            {
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get => _set[_index];
-            }
-        }
+			/// <summary>Gets the element at the current position of the enumerator.</summary>
+			public T Current
+			{
+				[MethodImpl(MethodImplOptions.AggressiveInlining)]
+				get => _set[_index];
+			}
+		}
 	}
 }

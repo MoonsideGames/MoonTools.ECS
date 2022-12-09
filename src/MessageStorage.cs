@@ -8,7 +8,7 @@ namespace MoonTools.ECS
 		public abstract void Clear();
 	}
 
-	internal class MessageStorage<TMessage> : MessageStorage where TMessage : struct
+	internal class MessageStorage<TMessage> : MessageStorage where TMessage : unmanaged
 	{
 		private int count = 0;
 		private int capacity = 128;
@@ -29,18 +29,18 @@ namespace MoonTools.ECS
 			}
 
 			messages[count] = message;
-
-			if (message is IHasEntity entityMessage)
-			{
-				if (!entityToIndices.ContainsKey(entityMessage.Entity.ID))
-				{
-					entityToIndices.Add(entityMessage.Entity.ID, new List<int>());
-				}
-
-				entityToIndices[entityMessage.Entity.ID].Add(count);
-			}
-
 			count += 1;
+		}
+
+		public void Add(int entityID, in TMessage message)
+		{
+			if (!entityToIndices.ContainsKey(entityID))
+			{
+				entityToIndices.Add(entityID, new List<int>());
+			}
+			entityToIndices[entityID].Add(count);
+
+			Add(message);
 		}
 
 		public bool Some()

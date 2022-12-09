@@ -43,17 +43,17 @@ namespace MoonTools.ECS
 			return MessageDepot.Some<TMessage>();
 		}
 
-		protected IEnumerable<TMessage> ReadMessagesWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged, IHasEntity
+		protected IEnumerable<TMessage> ReadMessagesWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged
 		{
 			return MessageDepot.WithEntity<TMessage>(entity.ID);
 		}
 
-		protected ref readonly TMessage ReadMessageWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged, IHasEntity
+		protected ref readonly TMessage ReadMessageWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged
 		{
 			return ref MessageDepot.FirstWithEntity<TMessage>(entity.ID);
 		}
 
-		protected bool SomeMessageWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged, IHasEntity
+		protected bool SomeMessageWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged
 		{
 			return MessageDepot.SomeWithEntity<TMessage>(entity.ID);
 		}
@@ -61,6 +61,11 @@ namespace MoonTools.ECS
 		protected void Send<TMessage>(in TMessage message) where TMessage : unmanaged
 		{
 			MessageDepot.Add(message);
+		}
+
+		protected void Send<TMessage>(in Entity entity, in TMessage message) where TMessage : unmanaged
+		{
+			MessageDepot.Add(entity.ID, message);
 		}
 
 		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged

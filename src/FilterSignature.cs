@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
-	public struct FilterSignature
+	public struct FilterSignature : IEquatable<FilterSignature>
 	{
 		public readonly HashSet<int> Included;
 		public readonly HashSet<int> Excluded;
@@ -39,6 +39,16 @@ namespace MoonTools.ECS
 			}
 
 			return hashcode;
+		}
+
+		public static bool operator ==(FilterSignature left, FilterSignature right)
+		{
+			return left.Equals(right);
+		}
+
+		public static bool operator !=(FilterSignature left, FilterSignature right)
+		{
+			return !(left == right);
 		}
 	}
 }

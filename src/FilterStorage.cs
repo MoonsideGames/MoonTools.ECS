@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MoonTools.ECS
@@ -7,7 +7,7 @@ namespace MoonTools.ECS
 	{
 		private EntityStorage EntityStorage;
 		private TypeIndices ComponentTypeIndices;
-		private Dictionary<FilterSignature, IndexableSet<int>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<int>>();
+		private Dictionary<FilterSignature, IndexableSet<Entity>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<Entity>>();
 		private Dictionary<int, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
 
 		public FilterStorage(EntityStorage entityStorage, TypeIndices componentTypeIndices)
@@ -21,7 +21,7 @@ namespace MoonTools.ECS
 			var filterSignature = new FilterSignature(included, excluded);
 			if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
 			{
-				filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<int>());
+				filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<Entity>());
 
 				foreach (var type in included)
 				{
@@ -46,20 +46,14 @@ namespace MoonTools.ECS
 			return new Filter(this, included, excluded);
 		}
 
-		public IEnumerable<Entity> FilterEntities(FilterSignature filterSignature)
+		public ReverseSpanEnumerator<Entity> FilterEntities(FilterSignature filterSignature)
 		{
-			foreach (var id in filterSignatureToEntityIDs[filterSignature])
-			{
-				yield return new Entity(id);
-			}
+			return filterSignatureToEntityIDs[filterSignature].GetEnumerator();
 		}
 
-		public IEnumerable<Entity> FilterEntitiesRandom(FilterSignature filterSignature)
+		public LinearCongruentialEnumerator FilterEntitiesRandom(FilterSignature filterSignature)
 		{
-			foreach (var index in RandomGenerator.LinearCongruentialGenerator(FilterCount(filterSignature)))
-			{
-				yield return new Entity(filterSignatureToEntityIDs[filterSignature][index]);
-			}
+			return RandomGenerator.LinearCongruentialGenerator(FilterCount(filterSignature));
 		}
 
 		public Entity FilterNthEntity(FilterSignature filterSignature, int index)
@@ -80,9 +74,9 @@ namespace MoonTools.ECS
 
 		public void Check(int entityID, int componentTypeIndex)
 		{
-			if (typeToFilterSignatures.ContainsKey(componentTypeIndex))
+			if (typeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
 			{
-				foreach (var filterSignature in typeToFilterSignatures[componentTypeIndex])
+				foreach (var filterSignature in filterSignatures)
 				{
 					CheckFilter(entityID, filterSignature);
 				}
@@ -140,9 +134,9 @@ namespace MoonTools.ECS
 
 		public void RemoveEntity(int entityID, int componentTypeIndex)
 		{
-			if (typeToFilterSignatures.ContainsKey(componentTypeIndex))
+			if (typeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
 			{
-				foreach (var filterSignature in typeToFilterSignatures[componentTypeIndex])
+				foreach (var filterSignature in filterSignatures)
 				{
 					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
 				}

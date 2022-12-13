@@ -9,7 +9,7 @@ namespace MoonTools.ECS
 		private Dictionary<T, int> indices;
 		private T[] array;
 		public int Count { get; private set; }
-		public Enumerator GetEnumerator() => new Enumerator(this);
+		public ReverseSpanEnumerator<T> GetEnumerator() => new ReverseSpanEnumerator<T>(new Span<T>(array, 0, Count));
 
 		public IndexableSet(int size = 32)
 		{

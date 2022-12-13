@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
@@ -13,8 +14,8 @@ namespace MoonTools.ECS
 			Signature = new FilterSignature(included, excluded);
 		}
 
-		public IEnumerable<Entity> Entities => FilterStorage.FilterEntities(Signature);
-		public IEnumerable<Entity> EntitiesInRandomOrder => FilterStorage.FilterEntitiesRandom(Signature);
+		public ReverseSpanEnumerator<Entity> Entities => FilterStorage.FilterEntities(Signature);
+		public LinearCongruentialEnumerator EntitiesInRandomOrder => FilterStorage.FilterEntitiesRandom(Signature);
 		public Entity RandomEntity => FilterStorage.FilterRandomEntity(Signature);
 
 		public int Count => FilterStorage.FilterCount(Signature);

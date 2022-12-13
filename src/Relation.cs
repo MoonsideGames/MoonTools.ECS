@@ -13,12 +13,6 @@ namespace MoonTools.ECS
 			B = entityB;
 		}
 
-		internal Relation(int idA, int idB)
-		{
-			A = new Entity(idA);
-			B = new Entity(idB);
-		}
-
 		public override bool Equals(object? obj)
 		{
 			return obj is Relation relation && Equals(relation);

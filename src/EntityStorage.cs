@@ -62,13 +62,12 @@ namespace MoonTools.ECS
 			EntityToRelationTypeIndices[entityId].Remove(relationIndex);
 		}
 
-		// TODO: should these ints be ID types?
-		public IEnumerable<int> ComponentTypeIndices(int entityID)
+		public HashSet<int> ComponentTypeIndices(int entityID)
 		{
 			return EntityToComponentTypeIndices[entityID];
 		}
 
-		public IEnumerable<int> RelationTypeIndices(int entityID)
+		public HashSet<int> RelationTypeIndices(int entityID)
 		{
 			return EntityToRelationTypeIndices[entityID];
 		}

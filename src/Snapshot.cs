@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MoonTools.ECS
@@ -50,7 +50,7 @@ namespace MoonTools.ECS
 				{
 					SnapshotEntityStorage.AddRelationKind(snapshotEntityID, relationTypeIndex);
 
-					foreach (var (otherEntityID, relationStorageIndex) in World.RelationDepot.OutRelationIndices(worldEntity.ID, relationTypeIndex))
+					foreach (var otherEntityID in World.RelationDepot.OutRelations(worldEntity.ID, relationTypeIndex))
 					{
 #if DEBUG
 						if (!World.FilterStorage.CheckSatisfied(otherEntityID, Filter.Signature))
@@ -58,6 +58,7 @@ namespace MoonTools.ECS
 							throw new InvalidOperationException($"Snapshot entity {worldEntity.ID} is related to non-snapshot entity {otherEntityID}!");
 						}
 #endif
+						var relationStorageIndex = World.RelationDepot.GetStorageIndex(relationTypeIndex, worldEntity, otherEntityID);
 						var otherSnapshotID = WorldToSnapshotID[otherEntityID];
 						SnapshotEntityStorage.AddRelationKind(otherSnapshotID, relationTypeIndex);
 						SnapshotRelationDepot.Set(snapshotEntityID, otherSnapshotID, relationTypeIndex, World.RelationDepot.Get(relationTypeIndex, relationStorageIndex));
@@ -99,8 +100,9 @@ namespace MoonTools.ECS
 				{
 					World.EntityStorage.AddRelationKind(worldID, relationTypeIndex);
 
-					foreach (var (otherEntityID, relationStorageIndex) in SnapshotRelationDepot.OutRelationIndices(i, relationTypeIndex))
+					foreach (var otherEntityID in SnapshotRelationDepot.OutRelations(i, relationTypeIndex))
 					{
+						var relationStorageIndex = SnapshotRelationDepot.GetStorageIndex(relationTypeIndex, i, otherEntityID);
 						var otherEntityWorldID = SnapshotToWorldID[otherEntityID];
 						World.RelationDepot.Set(worldID, otherEntityWorldID, relationTypeIndex, SnapshotRelationDepot.Get(relationTypeIndex, relationStorageIndex));
 					}

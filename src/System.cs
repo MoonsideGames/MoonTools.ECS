@@ -43,7 +43,7 @@ namespace MoonTools.ECS
 			return MessageDepot.Some<TMessage>();
 		}
 
-		protected IEnumerable<TMessage> ReadMessagesWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged
+		protected ReverseSpanEnumerator<TMessage> ReadMessagesWithEntity<TMessage>(in Entity entity) where TMessage : unmanaged
 		{
 			return MessageDepot.WithEntity<TMessage>(entity.ID);
 		}

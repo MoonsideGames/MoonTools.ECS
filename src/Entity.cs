@@ -35,5 +35,15 @@ namespace MoonTools.ECS
 		{
 			return !a.Equals(b);
 		}
+
+		public static implicit operator int(Entity e)
+		{
+			return e.ID;
+		}
+
+		public static implicit operator Entity(int i)
+		{
+			return new Entity(i);
+		}
 	}
 }

@@ -62,13 +62,18 @@ namespace MoonTools.ECS
 			return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
 		}
 
-		// relations go A->B, so given A, will give all outgoing B relations.
-		protected IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected TRelationKind GetRelationData<TRelationKind>(in Entity a, in Entity b) where TRelationKind : unmanaged
+		{
+			return RelationDepot.Get<TRelationKind>(new Relation(a.ID, b.ID));
+		}
+
+		// relations go A->B, so given A, will give all entities in outgoing relations of this kind.
+		protected ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.OutRelations<TRelationKind>(entity.ID);
 		}
 
-		protected (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected Entity OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.OutRelationSingleton<TRelationKind>(entity.ID);
 		}
@@ -83,13 +88,13 @@ namespace MoonTools.ECS
 			return RelationDepot.OutRelationCount<TRelationKind>(entity.ID);
 		}
 
-		// Relations go A->B, so given B, will give all incoming A relations.
-		protected IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		// Relations go A->B, so given B, will give all entities in incoming A relations of this kind.
+		protected ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.InRelations<TRelationKind>(entity.ID);
 		}
 
-		protected (Entity, TRelationKind) InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected Entity InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.InRelationSingleton<TRelationKind>(entity.ID);
 		}

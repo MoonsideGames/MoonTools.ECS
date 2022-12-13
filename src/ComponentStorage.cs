@@ -83,9 +83,8 @@ namespace MoonTools.ECS
 		// Returns true if the entity had this component.
 		public override bool Remove(int entityID)
 		{
-			if (entityIDToStorageIndex.ContainsKey(entityID))
+			if (entityIDToStorageIndex.TryGetValue(entityID, out int storageIndex))
 			{
-				var storageIndex = entityIDToStorageIndex[entityID];
 				entityIDToStorageIndex.Remove(entityID);
 
 				var lastElementIndex = nextID - 1;

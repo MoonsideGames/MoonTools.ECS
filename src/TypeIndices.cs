@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace MoonTools.ECS
@@ -27,7 +27,7 @@ namespace MoonTools.ECS
 
 
 #if DEBUG
-		public IEnumerable<Type> Types => TypeToIndex.Keys;
+		public Dictionary<Type, int>.KeyCollection Types => TypeToIndex.Keys;
 #endif
 	}
 }

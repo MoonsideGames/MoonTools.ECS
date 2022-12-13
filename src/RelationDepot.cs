@@ -41,6 +41,11 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().Set(relation, relationData);
 		}
 
+		public TRelationKind Get<TRelationKind>(Relation relation) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().Get(relation);
+		}
+
 		public (bool, bool) Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().Remove(relation);
@@ -61,12 +66,12 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().OutRelations(entityID);
 		}
 
-		public (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public Entity OutRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().OutFirst(entityID);
 		}
@@ -81,12 +86,12 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().HasOutRelation(entityID);
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelations(entityID);
 		}
 
-		public (Entity, TRelationKind) InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public Entity InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InFirst(entityID);
 		}
@@ -108,6 +113,11 @@ namespace MoonTools.ECS
 			storages[relationTypeIndex].Set(entityA, entityB, relationData);
 		}
 
+		public int GetStorageIndex(int relationTypeIndex, int entityA, int entityB)
+		{
+			return storages[relationTypeIndex].GetStorageIndex(entityA, entityB);
+		}
+
 		public unsafe void* Get(int relationTypeIndex, int relationStorageIndex)
 		{
 			return storages[relationTypeIndex].Get(relationStorageIndex);
@@ -118,9 +128,9 @@ namespace MoonTools.ECS
 			storages[relationTypeIndex].UnrelateAll(entityID);
 		}
 
-		public IEnumerable<(int, int)> OutRelationIndices(int entityID, int relationTypeIndex)
+		public ReverseSpanEnumerator<Entity> OutRelations(int entityID, int relationTypeIndex)
 		{
-			return storages[relationTypeIndex].OutRelationIndices(entityID);
+			return storages[relationTypeIndex].OutRelations(entityID);
 		}
 
 		public void Clear()

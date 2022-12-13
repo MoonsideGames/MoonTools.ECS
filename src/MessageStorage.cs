@@ -13,7 +13,8 @@ namespace MoonTools.ECS
 		private int count = 0;
 		private int capacity = 128;
 		private TMessage[] messages;
-		private Dictionary<int, List<int>> entityToIndices = new Dictionary<int, List<int>>();
+		// duplicating storage here for fast iteration
+		private Dictionary<int, DynamicArray<TMessage>> entityToMessages = new Dictionary<int, DynamicArray<TMessage>>();
 
 		public MessageStorage()
 		{
@@ -34,11 +35,11 @@ namespace MoonTools.ECS
 
 		public void Add(int entityID, in TMessage message)
 		{
-			if (!entityToIndices.ContainsKey(entityID))
+			if (!entityToMessages.ContainsKey(entityID))
 			{
-				entityToIndices.Add(entityID, new List<int>());
+				entityToMessages.Add(entityID, new DynamicArray<TMessage>());
 			}
-			entityToIndices[entityID].Add(count);
+			entityToMessages[entityID].Add(message);
 
 			Add(message);
 		}
@@ -58,31 +59,32 @@ namespace MoonTools.ECS
 			return messages[0];
 		}
 
-		public IEnumerable<TMessage> WithEntity(int entityID)
+		public ReverseSpanEnumerator<TMessage> WithEntity(int entityID)
 		{
-			if (entityToIndices.ContainsKey(entityID))
+			if (entityToMessages.TryGetValue(entityID, out var messages))
 			{
-				foreach (var index in entityToIndices[entityID])
-				{
-					yield return messages[index];
-				}
+				return messages.GetEnumerator();
+			}
+			else
+			{
+				return ReverseSpanEnumerator<TMessage>.Empty;
 			}
 		}
 
 		public ref readonly TMessage FirstWithEntity(int entityID)
 		{
-			return ref messages[entityToIndices[entityID][0]];
+			return ref entityToMessages[entityID][0];
 		}
 
 		public bool SomeWithEntity(int entityID)
 		{
-			return entityToIndices.ContainsKey(entityID) && entityToIndices[entityID].Count > 0;
+			return entityToMessages.ContainsKey(entityID) && entityToMessages[entityID].Count > 0;
 		}
 
 		public override void Clear()
 		{
 			count = 0;
-			foreach (var set in entityToIndices.Values)
+			foreach (var set in entityToMessages.Values)
 			{
 				set.Clear();
 			}

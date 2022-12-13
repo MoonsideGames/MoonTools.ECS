@@ -36,19 +36,19 @@ namespace MoonTools.ECS
 			return (RelationStorage<TRelationKind>) storages[storageIndex];
 		}
 
-		public void Set<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : unmanaged
+		public void Set<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
 		{
-			Lookup<TRelationKind>().Set(relation, relationData);
+			Lookup<TRelationKind>().Set(entityA, entityB, relationData);
 		}
 
-		public TRelationKind Get<TRelationKind>(Relation relation) where TRelationKind : unmanaged
+		public TRelationKind Get<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().Get(relation);
+			return Lookup<TRelationKind>().Get(entityA, entityB);
 		}
 
-		public (bool, bool) Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
+		public (bool, bool) Remove<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().Remove(relation);
+			return Lookup<TRelationKind>().Remove(entityA, entityB);
 		}
 
 		public void UnrelateAll<TRelationKind>(int entityID) where TRelationKind : unmanaged
@@ -56,14 +56,14 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().UnrelateAll(entityID);
 		}
 
-		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<(Entity, Entity)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().All();
 		}
 
 		public bool Related<TRelationKind>(int idA, int idB) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
+			return Lookup<TRelationKind>().Has((idA, idB));
 		}
 
 		public ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged

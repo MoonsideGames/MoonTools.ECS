@@ -52,7 +52,7 @@ namespace MoonTools.ECS
 			return ComponentDepot.GetSingletonEntity<TComponent>();
 		}
 
-		protected IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
+		protected ReverseSpanEnumerator<(Entity, Entity)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return RelationDepot.Relations<TRelationKind>();
 		}
@@ -64,7 +64,7 @@ namespace MoonTools.ECS
 
 		protected TRelationKind GetRelationData<TRelationKind>(in Entity a, in Entity b) where TRelationKind : unmanaged
 		{
-			return RelationDepot.Get<TRelationKind>(new Relation(a.ID, b.ID));
+			return RelationDepot.Get<TRelationKind>(a, b);
 		}
 
 		// relations go A->B, so given A, will give all entities in outgoing relations of this kind.

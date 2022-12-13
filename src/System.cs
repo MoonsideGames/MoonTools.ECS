@@ -70,7 +70,7 @@ namespace MoonTools.ECS
 
 		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
 		{
-			RelationDepot.Set<TRelationKind>(new Relation(entityA, entityB), relationData);
+			RelationDepot.Set(entityA, entityB, relationData);
 			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
 			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
 			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
@@ -78,7 +78,7 @@ namespace MoonTools.ECS
 
 		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{
-			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(new Relation(entityA, entityB));
+			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(entityA, entityB);
 
 			if (aEmpty)
 			{

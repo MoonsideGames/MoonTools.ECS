@@ -19,32 +19,30 @@ namespace MoonTools.ECS
 	internal class RelationStorage<TRelation> : RelationStorage where TRelation : unmanaged
 	{
 		private int count = 0;
-		private Dictionary<Relation, int> indices = new Dictionary<Relation, int>(16);
-		private Relation[] relations = new Relation[16];
+		private Dictionary<(Entity, Entity), int> indices = new Dictionary<(Entity, Entity), int>(16);
+		private (Entity, Entity)[] relations = new (Entity, Entity)[16];
 		private TRelation[] relationDatas = new TRelation[16];
 		private Dictionary<int, IndexableSet<Entity>> outRelations = new Dictionary<int, IndexableSet<Entity>>(16);
 		private Dictionary<int, IndexableSet<Entity>> inRelations = new Dictionary<int, IndexableSet<Entity>>(16);
 		private Stack<IndexableSet<Entity>> listPool = new Stack<IndexableSet<Entity>>();
 
-		public IEnumerable<(Entity, Entity, TRelation)> All()
+		public ReverseSpanEnumerator<(Entity, Entity)> All()
 		{
-			for (var i = 0; i < count; i += 1)
-			{
-				var relation = relations[i];
-				yield return (relation.A, relation.B, relationDatas[i]);
-			}
+			return new ReverseSpanEnumerator<(Entity, Entity)>(new Span<(Entity, Entity)>(relations, 0, count));
 		}
 
-		public void Set(Relation relation, TRelation relationData)
+		public void Set(in Entity entityA, in Entity entityB, TRelation relationData)
 		{
+			var relation = (entityA, entityB);
+
 			if (indices.TryGetValue(relation, out var index))
 			{
 				relationDatas[index] = relationData;
 				return;
 			}
 
-			var idA = relation.A.ID;
-			var idB = relation.B.ID;
+			var idA = entityA.ID;
+			var idB = entityB.ID;
 
 			if (!outRelations.ContainsKey(idA))
 			{
@@ -70,12 +68,12 @@ namespace MoonTools.ECS
 			count += 1;
 		}
 
-		public TRelation Get(Relation relation)
+		public TRelation Get(in Entity entityA, in Entity entityB)
 		{
-			return relationDatas[indices[relation]];
+			return relationDatas[indices[(entityA, entityB)]];
 		}
 
-		public bool Has(Relation relation)
+		public bool Has((Entity, Entity) relation)
 		{
 			return indices.ContainsKey(relation);
 		}
@@ -147,24 +145,25 @@ namespace MoonTools.ECS
 			return inRelations.TryGetValue(entityID, out var entityInRelations) ? entityInRelations.Count : 0;
 		}
 
-		public (bool, bool) Remove(Relation relation)
+		public (bool, bool) Remove(in Entity entityA, in Entity entityB)
 		{
 			var aEmpty = false;
 			var bEmpty = false;
+			var relation = (entityA, entityB);
 
-			if (outRelations.TryGetValue(relation.A.ID, out var entityOutRelations))
+			if (outRelations.TryGetValue(entityA.ID, out var entityOutRelations))
 			{
-				entityOutRelations.Remove(relation.B.ID);
-				if (outRelations[relation.A.ID].Count == 0)
+				entityOutRelations.Remove(entityB.ID);
+				if (outRelations[entityA.ID].Count == 0)
 				{
 					aEmpty = true;
 				}
 			}
 
-			if (inRelations.TryGetValue(relation.B.ID, out var entityInRelations))
+			if (inRelations.TryGetValue(entityB.ID, out var entityInRelations))
 			{
-				entityInRelations.Remove(relation.A.ID);
-				if (inRelations[relation.B.ID].Count == 0)
+				entityInRelations.Remove(entityA.ID);
+				if (inRelations[entityB.ID].Count == 0)
 				{
 					bEmpty = true;
 				}
@@ -210,12 +209,12 @@ namespace MoonTools.ECS
 
 		public override unsafe void Set(int entityA, int entityB, void* relationData)
 		{
-			Set(new Relation(entityA, entityB), *((TRelation*) relationData));
+			Set(entityA, entityB, *((TRelation*) relationData));
 		}
 
 		public override int GetStorageIndex(int entityA, int entityB)
 		{
-			return indices[new Relation(entityA, entityB)];
+			return indices[(entityA, entityB)];
 		}
 
 		public override unsafe void* Get(int relationStorageIndex)
@@ -232,7 +231,7 @@ namespace MoonTools.ECS
 			{
 				foreach (var entityB in entityOutRelations)
 				{
-					Remove(new Relation(entityID, entityB));
+					Remove(entityID, entityB);
 				}
 
 				ReturnHashSetToPool(entityOutRelations);
@@ -243,7 +242,7 @@ namespace MoonTools.ECS
 			{
 				foreach (var entityA in entityInRelations)
 				{
-					Remove(new Relation(entityA, entityID));
+					Remove(entityA, entityID);
 				}
 
 				ReturnHashSetToPool(entityInRelations);

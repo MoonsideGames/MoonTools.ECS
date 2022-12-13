@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
@@ -19,7 +19,7 @@ namespace MoonTools.ECS
 			return TemplateToComponentTypeIndices[templateID].Add(componentTypeIndex);
 		}
 
-		public IEnumerable<int> ComponentTypeIndices(int templateID)
+		public HashSet<int> ComponentTypeIndices(int templateID)
 		{
 			return TemplateToComponentTypeIndices[templateID];
 		}

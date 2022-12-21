@@ -86,6 +86,11 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().HasOutRelation(entityID);
 		}
 
+		public bool HasOutRelation(int entityID, int typeIndex)
+		{
+			return storages[typeIndex].HasOutRelation(entityID);
+		}
+
 		public ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelations(entityID);
@@ -99,6 +104,11 @@ namespace MoonTools.ECS
 		public bool HasInRelation<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().HasInRelation(entityID);
+		}
+
+		public bool HasInRelation(int entityID, int typeIndex)
+		{
+			return storages[typeIndex].HasInRelation(entityID);
 		}
 
 		public int InRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged

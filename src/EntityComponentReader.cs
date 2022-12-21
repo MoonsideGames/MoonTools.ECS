@@ -9,7 +9,7 @@ namespace MoonTools.ECS
 		internal EntityStorage EntityStorage => World.EntityStorage;
 		internal ComponentDepot ComponentDepot => World.ComponentDepot;
 		internal RelationDepot RelationDepot => World.RelationDepot;
-		protected FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
+		protected FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices, RelationTypeIndices);
 		internal FilterStorage FilterStorage => World.FilterStorage;
 		internal TypeIndices ComponentTypeIndices => World.ComponentTypeIndices;
 		internal TypeIndices RelationTypeIndices => World.RelationTypeIndices;

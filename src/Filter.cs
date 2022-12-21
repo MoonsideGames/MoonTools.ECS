@@ -8,10 +8,15 @@ namespace MoonTools.ECS
 		internal FilterSignature Signature;
 		private FilterStorage FilterStorage;
 
-		internal Filter(FilterStorage filterStorage, HashSet<int> included, HashSet<int> excluded)
-		{
+		internal Filter(
+			FilterStorage filterStorage,
+			HashSet<int> included,
+			HashSet<int> excluded,
+			HashSet<int> inRelations,
+			HashSet<int> outRelations
+		) {
 			FilterStorage = filterStorage;
-			Signature = new FilterSignature(included, excluded);
+			Signature = new FilterSignature(included, excluded, inRelations, outRelations);
 		}
 
 		public ReverseSpanEnumerator<Entity> Entities => FilterStorage.FilterEntities(Signature);

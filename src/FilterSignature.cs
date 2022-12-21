@@ -3,15 +3,23 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
-	public struct FilterSignature : IEquatable<FilterSignature>
+	internal struct FilterSignature : IEquatable<FilterSignature>
 	{
 		public readonly HashSet<int> Included;
 		public readonly HashSet<int> Excluded;
+		public readonly HashSet<int> InRelations;
+		public readonly HashSet<int> OutRelations;
 
-		public FilterSignature(HashSet<int> included, HashSet<int> excluded)
-		{
+		public FilterSignature(
+			HashSet<int> included,
+			HashSet<int> excluded,
+			HashSet<int> inRelations,
+			HashSet<int> outRelations
+		) {
 			Included = included;
 			Excluded = excluded;
+			InRelations = inRelations;
+			OutRelations = outRelations;
 		}
 
 		public override bool Equals(object? obj)
@@ -21,7 +29,11 @@ namespace MoonTools.ECS
 
 		public bool Equals(FilterSignature other)
 		{
-			return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
+			return
+				Included.SetEquals(other.Included) &&
+				Excluded.SetEquals(other.Excluded) &&
+				InRelations.SetEquals(other.InRelations) &&
+				OutRelations.SetEquals(other.OutRelations);
 		}
 
 		public override int GetHashCode()
@@ -34,6 +46,16 @@ namespace MoonTools.ECS
 			}
 
 			foreach (var type in Excluded)
+			{
+				hashcode = HashCode.Combine(hashcode, type);
+			}
+
+			foreach (var type in InRelations)
+			{
+				hashcode = HashCode.Combine(hashcode, type);
+			}
+
+			foreach (var type in OutRelations)
 			{
 				hashcode = HashCode.Combine(hashcode, type);
 			}

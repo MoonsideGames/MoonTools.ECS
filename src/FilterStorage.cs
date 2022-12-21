@@ -6,44 +6,78 @@ namespace MoonTools.ECS
 	internal class FilterStorage
 	{
 		private EntityStorage EntityStorage;
+		private RelationDepot RelationDepot;
 		private TypeIndices ComponentTypeIndices;
+		private TypeIndices RelationTypeIndices;
 		private Dictionary<FilterSignature, IndexableSet<Entity>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<Entity>>();
-		private Dictionary<int, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
+		private Dictionary<int, HashSet<FilterSignature>> componentTypeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
+		private Dictionary<int, HashSet<FilterSignature>> relationTypeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
 
-		public FilterStorage(EntityStorage entityStorage, TypeIndices componentTypeIndices)
-		{
+		public FilterStorage(
+			EntityStorage entityStorage,
+			RelationDepot relationDepot,
+			TypeIndices componentTypeIndices,
+			TypeIndices relationTypeIndices
+		) {
 			EntityStorage = entityStorage;
+			RelationDepot = relationDepot;
 			ComponentTypeIndices = componentTypeIndices;
+			RelationTypeIndices = relationTypeIndices;
 		}
 
-		public Filter CreateFilter(HashSet<int> included, HashSet<int> excluded)
-		{
-			var filterSignature = new FilterSignature(included, excluded);
+		public Filter CreateFilter(
+			HashSet<int> included,
+			HashSet<int> excluded,
+			HashSet<int> inRelations,
+			HashSet<int> outRelations
+		) {
+			var filterSignature = new FilterSignature(included, excluded, inRelations, outRelations);
 			if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
 			{
 				filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<Entity>());
 
 				foreach (var type in included)
 				{
-					if (!typeToFilterSignatures.ContainsKey(type))
+					if (!componentTypeToFilterSignatures.ContainsKey(type))
 					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+						componentTypeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
 					}
 
-					typeToFilterSignatures[type].Add(filterSignature);
+					componentTypeToFilterSignatures[type].Add(filterSignature);
 				}
 
 				foreach (var type in excluded)
 				{
-					if (!typeToFilterSignatures.ContainsKey(type))
+					if (!componentTypeToFilterSignatures.ContainsKey(type))
 					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+						componentTypeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
 					}
 
-					typeToFilterSignatures[type].Add(filterSignature);
+					componentTypeToFilterSignatures[type].Add(filterSignature);
+				}
+
+				foreach (var type in inRelations)
+				{
+					if (!relationTypeToFilterSignatures.ContainsKey(type))
+					{
+						relationTypeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+					}
+
+					relationTypeToFilterSignatures[type].Add(filterSignature);
+				}
+
+				foreach (var type in outRelations)
+				{
+					if (!relationTypeToFilterSignatures.ContainsKey(type))
+					{
+						relationTypeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+					}
+
+					relationTypeToFilterSignatures[type].Add(filterSignature);
 				}
 			}
-			return new Filter(this, included, excluded);
+
+			return new Filter(this, included, excluded, inRelations, outRelations);
 		}
 
 		public ReverseSpanEnumerator<Entity> FilterEntities(FilterSignature filterSignature)
@@ -72,9 +106,20 @@ namespace MoonTools.ECS
 			return filterSignatureToEntityIDs[filterSignature].Count;
 		}
 
-		public void Check(int entityID, int componentTypeIndex)
+		public void CheckComponentChange(int entityID, int componentTypeIndex)
 		{
-			if (typeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
+			if (componentTypeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
+			{
+				foreach (var filterSignature in filterSignatures)
+				{
+					CheckFilter(entityID, filterSignature);
+				}
+			}
+		}
+
+		public void CheckRelationChange(int entityID, int relationTypeIndex)
+		{
+			if (relationTypeToFilterSignatures.TryGetValue(relationTypeIndex, out var filterSignatures))
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
@@ -85,7 +130,7 @@ namespace MoonTools.ECS
 
 		public void Check<TComponent>(int entityID) where TComponent : unmanaged
 		{
-			Check(entityID, ComponentTypeIndices.GetIndex<TComponent>());
+			CheckComponentChange(entityID, ComponentTypeIndices.GetIndex<TComponent>());
 		}
 
 		public bool CheckSatisfied(int entityID, FilterSignature filterSignature)
@@ -106,35 +151,40 @@ namespace MoonTools.ECS
 				}
 			}
 
+			foreach (var type in filterSignature.InRelations)
+			{
+				if (!RelationDepot.HasInRelation(entityID, type))
+				{
+					return false;
+				}
+			}
+
+			foreach (var type in filterSignature.OutRelations)
+			{
+				if (!RelationDepot.HasOutRelation(entityID, type))
+				{
+					return false;
+				}
+			}
+
 			return true;
 		}
 
 		private void CheckFilter(int entityID, FilterSignature filterSignature)
 		{
-			foreach (var type in filterSignature.Included)
+			if (CheckSatisfied(entityID, filterSignature))
 			{
-				if (!EntityStorage.HasComponent(entityID, type))
-				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					return;
-				}
+				filterSignatureToEntityIDs[filterSignature].Remove(entityID);
 			}
-
-			foreach (var type in filterSignature.Excluded)
+			else
 			{
-				if (EntityStorage.HasComponent(entityID, type))
-				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					return;
-				}
+				filterSignatureToEntityIDs[filterSignature].Remove(entityID);
 			}
-
-			filterSignatureToEntityIDs[filterSignature].Add(entityID);
 		}
 
 		public void RemoveEntity(int entityID, int componentTypeIndex)
 		{
-			if (typeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
+			if (componentTypeToFilterSignatures.TryGetValue(componentTypeIndex, out var filterSignatures))
 			{
 				foreach (var filterSignature in filterSignatures)
 				{

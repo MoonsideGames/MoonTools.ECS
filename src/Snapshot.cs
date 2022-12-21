@@ -87,7 +87,7 @@ namespace MoonTools.ECS
 				foreach (var componentTypeIndex in SnapshotEntityStorage.ComponentTypeIndices(i))
 				{
 					World.EntityStorage.SetComponent(entity.ID, componentTypeIndex);
-					World.FilterStorage.Check(entity.ID, componentTypeIndex);
+					World.FilterStorage.CheckComponentChange(entity.ID, componentTypeIndex);
 					World.ComponentDepot.Set(entity.ID, componentTypeIndex, SnapshotComponentDepot.UntypedGet(i, componentTypeIndex));
 				}
 			}

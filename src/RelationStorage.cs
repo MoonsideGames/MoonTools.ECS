@@ -5,6 +5,8 @@ namespace MoonTools.ECS
 {
 	internal abstract class RelationStorage
 	{
+		public abstract bool HasInRelation(int entityID);
+		public abstract bool HasOutRelation(int entityID);
 		public abstract unsafe void Set(int entityA, int entityB, void* relationData);
 		public abstract int GetStorageIndex(int entityA, int entityB);
 		public abstract unsafe void* Get(int relationStorageIndex);
@@ -101,7 +103,7 @@ namespace MoonTools.ECS
 			return outRelations[entityID][0];
 		}
 
-		public bool HasOutRelation(int entityID)
+		public override bool HasOutRelation(int entityID)
 		{
 			return outRelations.ContainsKey(entityID) && outRelations[entityID].Count > 0;
 		}
@@ -135,7 +137,7 @@ namespace MoonTools.ECS
 			return inRelations[entityID][0];
 		}
 
-		public bool HasInRelation(int entityID)
+		public override bool HasInRelation(int entityID)
 		{
 			return inRelations.ContainsKey(entityID) && inRelations[entityID].Count > 0;
 		}

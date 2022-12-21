@@ -11,7 +11,7 @@ namespace MoonTools.ECS
 		internal readonly MessageDepot MessageDepot = new MessageDepot();
 		internal readonly RelationDepot RelationDepot;
 		internal readonly FilterStorage FilterStorage;
-		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
+		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices, RelationTypeIndices);
 
 		internal readonly TemplateStorage TemplateStorage = new TemplateStorage();
 		internal readonly ComponentDepot TemplateComponentDepot;
@@ -20,7 +20,7 @@ namespace MoonTools.ECS
 		{
 			ComponentDepot = new ComponentDepot(ComponentTypeIndices);
 			RelationDepot = new RelationDepot(RelationTypeIndices);
-			FilterStorage = new FilterStorage(EntityStorage, ComponentTypeIndices);
+			FilterStorage = new FilterStorage(EntityStorage, RelationDepot, ComponentTypeIndices, RelationTypeIndices);
 			TemplateComponentDepot = new ComponentDepot(ComponentTypeIndices);
 		}
 
@@ -66,7 +66,7 @@ namespace MoonTools.ECS
 			foreach (var componentTypeIndex in TemplateStorage.ComponentTypeIndices(template.ID))
 			{
 				EntityStorage.SetComponent(entity.ID, componentTypeIndex);
-				FilterStorage.Check(entity.ID, componentTypeIndex);
+				FilterStorage.CheckComponentChange(entity.ID, componentTypeIndex);
 				ComponentDepot.Set(entity.ID, componentTypeIndex, TemplateComponentDepot.UntypedGet(template.ID, componentTypeIndex));
 			}
 

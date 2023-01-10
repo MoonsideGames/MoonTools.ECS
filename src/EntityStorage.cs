@@ -18,8 +18,14 @@ namespace MoonTools.ECS
 		public Entity Create()
 		{
 			var entity = new Entity(NextID());
-			EntityToComponentTypeIndices.TryAdd(entity.ID, new HashSet<int>());
-			EntityToRelationTypeIndices.TryAdd(entity.ID, new HashSet<int>());
+			if (!EntityToComponentTypeIndices.ContainsKey(entity.ID))
+			{
+				EntityToComponentTypeIndices.Add(entity.ID, new HashSet<int>());
+			}
+			if (!EntityToRelationTypeIndices.ContainsKey(entity.ID))
+			{
+				EntityToRelationTypeIndices.Add(entity.ID, new HashSet<int>());
+			}
 			return entity;
 		}
 

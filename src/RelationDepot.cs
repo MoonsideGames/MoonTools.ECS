@@ -6,31 +6,49 @@ namespace MoonTools.ECS
 {
 	internal class RelationDepot
 	{
-		private Dictionary<Type, RelationStorage> storages = new Dictionary<Type, RelationStorage>();
+		private TypeIndices RelationTypeIndices;
+		private RelationStorage[] storages = new RelationStorage[256];
 
-		private void Register<TRelationKind>() where TRelationKind : unmanaged
+		public RelationDepot(TypeIndices relationTypeIndices)
 		{
-			if (!storages.ContainsKey(typeof(TRelationKind)))
+			RelationTypeIndices = relationTypeIndices;
+		}
+
+		private void Register<TRelationKind>(int index) where TRelationKind : unmanaged
+		{
+			if (index >= storages.Length)
 			{
-				storages.Add(typeof(TRelationKind), new RelationStorage<TRelationKind>());
+				Array.Resize(ref storages, storages.Length * 2);
 			}
+
+			storages[index] = new RelationStorage<TRelationKind>();
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private RelationStorage<TRelationKind> Lookup<TRelationKind>() where TRelationKind : unmanaged
 		{
-			Register<TRelationKind>();
-			return (RelationStorage<TRelationKind>) storages[typeof(TRelationKind)];
+			var storageIndex = RelationTypeIndices.GetIndex<TRelationKind>();
+			// TODO: is there some way to avoid this null check?
+			if (storages[storageIndex] == null)
+			{
+				Register<TRelationKind>(storageIndex);
+			}
+			return (RelationStorage<TRelationKind>) storages[storageIndex];
 		}
 
-		public void Set<TRelationKind>(Relation relation, TRelationKind relationData) where TRelationKind : unmanaged
+		public void Set<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
 		{
-			Lookup<TRelationKind>().Set(relation, relationData);
+			Lookup<TRelationKind>().Set(entityA, entityB, relationData);
 		}
 
-		public void Remove<TRelationKind>(Relation relation) where TRelationKind : unmanaged
+		public TRelationKind Get<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{
-			Lookup<TRelationKind>().Remove(relation);
+			return Lookup<TRelationKind>().Get(entityA, entityB);
+		}
+
+		public (bool, bool) Remove<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().Remove(entityA, entityB);
 		}
 
 		public void UnrelateAll<TRelationKind>(int entityID) where TRelationKind : unmanaged
@@ -38,31 +56,22 @@ namespace MoonTools.ECS
 			Lookup<TRelationKind>().UnrelateAll(entityID);
 		}
 
-		// FIXME: optimize this
-		public void OnEntityDestroy(int entityID)
-		{
-			foreach (var storage in storages.Values)
-			{
-				storage.OnEntityDestroy(entityID);
-			}
-		}
-
-		public IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<(Entity, Entity)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().All();
 		}
 
 		public bool Related<TRelationKind>(int idA, int idB) where TRelationKind : unmanaged
 		{
-			return Lookup<TRelationKind>().Has(new Relation(idA, idB));
+			return Lookup<TRelationKind>().Has((idA, idB));
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().OutRelations(entityID);
 		}
 
-		public (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public Entity OutRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().OutFirst(entityID);
 		}
@@ -77,12 +86,12 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().HasOutRelation(entityID);
 		}
 
-		public IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelations(entityID);
 		}
 
-		public (Entity, TRelationKind) InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
+		public Entity InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InFirst(entityID);
 		}
@@ -97,24 +106,52 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().InRelationCount(entityID);
 		}
 
-		public void Save(RelationDepotState state)
-		{
-			foreach (var (type, storage) in storages)
-			{
-				if (!state.StorageStates.ContainsKey(type))
-				{
-					state.StorageStates.Add(type, storage.CreateState());
-				}
+		// untyped methods used for destroying and snapshots
 
-				storage.Save(state.StorageStates[type]);
+		public unsafe void Set(int entityA, int entityB, int relationTypeIndex, void* relationData)
+		{
+			storages[relationTypeIndex].Set(entityA, entityB, relationData);
+		}
+
+		public int GetStorageIndex(int relationTypeIndex, int entityA, int entityB)
+		{
+			return storages[relationTypeIndex].GetStorageIndex(entityA, entityB);
+		}
+
+		public unsafe void* Get(int relationTypeIndex, int relationStorageIndex)
+		{
+			return storages[relationTypeIndex].Get(relationStorageIndex);
+		}
+
+		public void UnrelateAll(int entityID, int relationTypeIndex)
+		{
+			storages[relationTypeIndex].UnrelateAll(entityID);
+		}
+
+		public ReverseSpanEnumerator<Entity> OutRelations(int entityID, int relationTypeIndex)
+		{
+			return storages[relationTypeIndex].OutRelations(entityID);
+		}
+
+		public void Clear()
+		{
+			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
+			{
+				if (storages[i] != null)
+				{
+					storages[i].Clear();
+				}
 			}
 		}
 
-		public void Load(RelationDepotState state)
+		public void CreateMissingStorages(RelationDepot other)
 		{
-			foreach (var (type, storageState) in state.StorageStates)
+			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
 			{
-				storages[type].Load(storageState);
+				if (storages[i] == null && other.storages[i] != null)
+				{
+					storages[i] = other.storages[i].CreateStorage();
+				}
 			}
 		}
 	}

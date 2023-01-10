@@ -13,19 +13,31 @@ namespace MoonTools.ECS
 		{
 		}
 
-		protected IEnumerable<object> Debug_GetAllComponents(Entity entity)
+		protected IEnumerable<dynamic> Debug_GetAllComponents(Entity entity)
 		{
-			return ComponentDepot.Debug_GetAllComponents(entity.ID);
+			foreach (var typeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+			{
+				yield return ComponentDepot.Debug_Get(entity.ID, typeIndex);
+			}
 		}
 
 		protected IEnumerable<Entity> Debug_GetEntities(Type componentType)
 		{
-			return ComponentDepot.Debug_GetEntities(componentType);
+			foreach (var entityID in ComponentDepot.Debug_GetEntityIDs(ComponentTypeIndices.GetIndex(componentType)))
+			{
+				yield return new Entity(entityID);
+			}
 		}
 
 		protected IEnumerable<Type> Debug_SearchComponentType(string typeString)
 		{
-			return ComponentDepot.Debug_SearchComponentType(typeString);
+			foreach (var type in ComponentTypeIndices.Types)
+			{
+				if (type.ToString().ToLower().Contains(typeString.ToLower()))
+				{
+					yield return type;
+				}
+			}
 		}
 	}
 }

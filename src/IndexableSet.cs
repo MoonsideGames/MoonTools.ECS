@@ -1,15 +1,15 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace MoonTools.ECS
 {
-	internal class IndexableSet<T> : IEnumerable<T> where T : unmanaged
+	internal class IndexableSet<T> where T : unmanaged
 	{
 		private Dictionary<T, int> indices;
 		private T[] array;
 		public int Count { get; private set; }
+		public ReverseSpanEnumerator<T> GetEnumerator() => new ReverseSpanEnumerator<T>(new Span<T>(array, 0, Count));
 
 		public IndexableSet(int size = 32)
 		{
@@ -64,52 +64,47 @@ namespace MoonTools.ECS
 			return true;
 		}
 
-		public IEnumerator<T> GetEnumerator()
-		{
-			for (var i = Count - 1; i >= 0; i -= 1)
-			{
-				yield return array[i];
-			}
-		}
-
-		IEnumerator IEnumerable.GetEnumerator()
-		{
-			for (var i = Count - 1; i >= 0; i -= 1)
-			{
-				yield return array[i];
-			}
-		}
-
 		public void Clear()
 		{
 			Count = 0;
 		}
 
-		public void Save(IndexableSetState<T> state)
+		public struct Enumerator
 		{
-			ReadOnlySpan<byte> arrayBytes = MemoryMarshal.Cast<T, byte>(array);
+			/// <summary>The set being enumerated.</summary>
+			private readonly IndexableSet<T> _set;
+			/// <summary>The next index to yield.</summary>
+			private int _index;
 
-			if (arrayBytes.Length > state.Array.Length)
+			/// <summary>Initialize the enumerator.</summary>
+			/// <param name="set">The set to enumerate.</param>
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			internal Enumerator(IndexableSet<T> set)
 			{
-				Array.Resize(ref state.Array, arrayBytes.Length);
+				_set = set;
+				_index = _set.Count;
 			}
 
-			arrayBytes.CopyTo(state.Array);
-
-			state.Count = Count;
-		}
-
-		public void Load(IndexableSetState<T> state)
-		{
-			state.Array.CopyTo(MemoryMarshal.Cast<T, byte>(array));
-
-			indices.Clear();
-			for (var i = 0; i < state.Count; i += 1)
+			/// <summary>Advances the enumerator to the next element of the span.</summary>
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			public bool MoveNext()
 			{
-				indices[array[i]] = i;
+				int index = _index - 1;
+				if (index >= 0)
+				{
+					_index = index;
+					return true;
+				}
+
+				return false;
 			}
 
-			Count = state.Count;
+			/// <summary>Gets the element at the current position of the enumerator.</summary>
+			public T Current
+			{
+				[MethodImpl(MethodImplOptions.AggressiveInlining)]
+				get => _set[_index];
+			}
 		}
 	}
 }

@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace MoonTools.ECS
 {
@@ -20,7 +20,7 @@ namespace MoonTools.ECS
 		/// <summary>
 		/// A psuedorandom nonrepeating sequence of integers from 0 to n.
 		/// </summary>
-		public static IEnumerable<int> LinearCongruentialGenerator(int n)
+		public static LinearCongruentialEnumerator LinearCongruentialGenerator(int n)
 		{
 			var x = Primes[random.Next(Primes.Length - 1)];
 			while (x % n == 0)
@@ -29,12 +29,44 @@ namespace MoonTools.ECS
 				x = Primes[random.Next(Primes.Length - 1)];
 			}
 
-			var start = random.Next(n);
+			return new LinearCongruentialEnumerator(random.Next(n), x, n);
+		}
+	}
 
-			for (var i = start; i < start + n; i++)
+	public struct LinearCongruentialEnumerator
+	{
+		private readonly int start;
+		private readonly int count;
+		private readonly int prime;
+		private int current;
+
+		public LinearCongruentialEnumerator GetEnumerator() => this;
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal LinearCongruentialEnumerator(int start, int prime, int count)
+		{
+			current = start;
+			this.start = start;
+			this.prime = prime;
+			this.count = count;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public bool MoveNext()
+		{
+			current += 1;
+			if (current < start + count)
 			{
-				yield return (i * x) % n;
+				return true;
 			}
+
+			return false;
+		}
+
+		public int Current
+		{
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			get => (current * prime) % count;
 		}
 	}
 }

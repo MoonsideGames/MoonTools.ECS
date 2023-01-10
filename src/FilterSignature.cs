@@ -3,14 +3,12 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
-	public struct FilterSignature
+	public struct FilterSignature : IEquatable<FilterSignature>
 	{
-		private const int HASH_FACTOR = 97;
+		public readonly HashSet<int> Included;
+		public readonly HashSet<int> Excluded;
 
-		public readonly HashSet<Type> Included;
-		public readonly HashSet<Type> Excluded;
-
-		public FilterSignature(HashSet<Type> included, HashSet<Type> excluded)
+		public FilterSignature(HashSet<int> included, HashSet<int> excluded)
 		{
 			Included = included;
 			Excluded = excluded;
@@ -26,26 +24,31 @@ namespace MoonTools.ECS
 			return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
 		}
 
-		private int GuidToInt(Guid guid)
-		{
-			return BitConverter.ToInt32(guid.ToByteArray());
-		}
-
 		public override int GetHashCode()
 		{
-			int result = 1;
+			var hashcode = 1;
+
 			foreach (var type in Included)
 			{
-				result *= HASH_FACTOR + GuidToInt(type.GUID);
+				hashcode = HashCode.Combine(hashcode, type);
 			}
 
-			// FIXME: Is there a way to avoid collisions when this is the same set as included?
 			foreach (var type in Excluded)
 			{
-				result *= HASH_FACTOR + GuidToInt(type.GUID);
+				hashcode = HashCode.Combine(hashcode, type);
 			}
 
-			return result;
+			return hashcode;
+		}
+
+		public static bool operator ==(FilterSignature left, FilterSignature right)
+		{
+			return left.Equals(right);
+		}
+
+		public static bool operator !=(FilterSignature left, FilterSignature right)
+		{
+			return !(left == right);
 		}
 	}
 }

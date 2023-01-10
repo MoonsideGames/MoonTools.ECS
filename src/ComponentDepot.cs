@@ -6,41 +6,36 @@ namespace MoonTools.ECS
 {
 	internal class ComponentDepot
 	{
-		private Dictionary<Type, ComponentStorage> storages = new Dictionary<Type, ComponentStorage>();
+		private TypeIndices ComponentTypeIndices;
 
-		private Dictionary<FilterSignature, IndexableSet<int>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<int>>();
+		private ComponentStorage[] storages = new ComponentStorage[256];
 
-		private Dictionary<Type, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<Type, HashSet<FilterSignature>>();
-
-#if DEBUG
-		private Dictionary<Type, Filter> singleComponentFilters = new Dictionary<Type, Filter>();
-#endif
-
-		private HashSet<Type> TypesWithDisabledSerialization = new HashSet<Type>();
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal void Register<TComponent>() where TComponent : unmanaged
+		public ComponentDepot(TypeIndices componentTypeIndices)
 		{
-			if (!storages.ContainsKey(typeof(TComponent)))
-			{
-				storages.Add(typeof(TComponent), new ComponentStorage<TComponent>());
-#if DEBUG
-				singleComponentFilters.Add(typeof(TComponent), CreateFilter(new HashSet<Type>() { typeof(TComponent) }, new HashSet<Type>()));
-#endif
-			}
+			ComponentTypeIndices = componentTypeIndices;
 		}
 
-		private ComponentStorage Lookup(Type type)
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal void Register<TComponent>(int index) where TComponent : unmanaged
 		{
-			return storages[type];
+			if (index >= storages.Length)
+			{
+				Array.Resize(ref storages, storages.Length * 2);
+			}
+
+			storages[index] = new ComponentStorage<TComponent>();
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private ComponentStorage<TComponent> Lookup<TComponent>() where TComponent : unmanaged
 		{
-			// TODO: is it possible to optimize this?
-			Register<TComponent>();
-			return (ComponentStorage<TComponent>) storages[typeof(TComponent)];
+			var storageIndex = ComponentTypeIndices.GetIndex<TComponent>();
+			// TODO: is there some way to avoid this null check?
+			if (storages[storageIndex] == null)
+			{
+				Register<TComponent>(storageIndex);
+			}
+			return (ComponentStorage<TComponent>) storages[storageIndex];
 		}
 
 		public bool Some<TComponent>() where TComponent : unmanaged
@@ -48,41 +43,19 @@ namespace MoonTools.ECS
 			return Lookup<TComponent>().Any();
 		}
 
-		public bool Has<TComponent>(int entityID) where TComponent : unmanaged
-		{
-			return Lookup<TComponent>().Has(entityID);
-		}
-
-		private bool Has(Type type, int entityID)
-		{
-			return Lookup(type).Has(entityID);
-		}
-
 		public ref readonly TComponent Get<TComponent>(int entityID) where TComponent : unmanaged
 		{
 			return ref Lookup<TComponent>().Get(entityID);
 		}
 
-		public ref readonly TComponent Get<TComponent>() where TComponent : unmanaged
+		public ref readonly TComponent GetFirst<TComponent>() where TComponent : unmanaged
 		{
-			return ref Lookup<TComponent>().Get();
+			return ref Lookup<TComponent>().GetFirst();
 		}
 
 		public void Set<TComponent>(int entityID, in TComponent component) where TComponent : unmanaged
 		{
-			var existed = Lookup<TComponent>().Set(entityID, component);
-
-			// update filters
-			if (!existed)
-			{
-				if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
-				{
-					foreach (var filterSignature in filterSignatures)
-					{
-						CheckFilter(filterSignature, entityID);
-					}
-				}
-			}
+			Lookup<TComponent>().Set(entityID, component);
 		}
 
 		public Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
@@ -95,208 +68,61 @@ namespace MoonTools.ECS
 			return Lookup<TComponent>().AllComponents();
 		}
 
-		private void Remove(Type type, int entityID)
+		public void Remove(int entityID, int storageIndex)
 		{
-			var existed = Lookup(type).Remove(entityID);
-
-			// update filters
-			if (existed)
-			{
-				if (typeToFilterSignatures.TryGetValue(type, out var filterSignatures))
-				{
-					foreach (var filterSignature in filterSignatures)
-					{
-						CheckFilter(filterSignature, entityID);
-					}
-				}
-			}
+			storages[storageIndex].Remove(entityID);
 		}
 
 		public void Remove<TComponent>(int entityID) where TComponent : unmanaged
 		{
-			var existed = Lookup<TComponent>().Remove(entityID);
+			Lookup<TComponent>().Remove(entityID);
+		}
 
-			// update filters
-			if (existed)
+		public void Clear()
+		{
+			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
 			{
-				if (typeToFilterSignatures.TryGetValue(typeof(TComponent), out var filterSignatures))
+				if (storages[i] != null)
 				{
-					foreach (var filterSignature in filterSignatures)
-					{
-						CheckFilter(filterSignature, entityID);
-					}
+					storages[i].Clear();
 				}
 			}
 		}
 
-		// TODO: is there some way to optimize this without complicating serialization?
-		public void OnEntityDestroy(int entityID)
+		// these methods used to implement snapshots, templates, and debugging
+
+		internal unsafe void* UntypedGet(int entityID, int componentTypeIndex)
 		{
-			foreach (var type in storages.Keys)
-			{
-				Remove(type, entityID);
-			}
+			return storages[componentTypeIndex].UntypedGet(entityID);
 		}
 
-		public Filter CreateFilter(HashSet<Type> included, HashSet<Type> excluded)
+		internal unsafe void Set(int entityID, int componentTypeIndex, void* component)
 		{
-			var filterSignature = new FilterSignature(included, excluded);
-			if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
-			{
-				filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<int>());
+			storages[componentTypeIndex].Set(entityID, component);
+		}
 
-				foreach (var type in included)
+		public void CreateMissingStorages(ComponentDepot other)
+		{
+			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
+			{
+				if (storages[i] == null && other.storages[i] != null)
 				{
-					if (!typeToFilterSignatures.ContainsKey(type))
-					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
-					}
-
-					typeToFilterSignatures[type].Add(filterSignature);
-				}
-
-				foreach (var type in excluded)
-				{
-					if (!typeToFilterSignatures.ContainsKey(type))
-					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
-					}
-
-					typeToFilterSignatures[type].Add(filterSignature);
-				}
-			}
-			return new Filter(this, included, excluded);
-		}
-
-		// FIXME: this dictionary should probably just store entities
-		public IEnumerable<Entity> FilterEntities(Filter filter)
-		{
-			foreach (var id in filterSignatureToEntityIDs[filter.Signature])
-			{
-				yield return new Entity(id);
-			}
-		}
-
-		public IEnumerable<Entity> FilterEntitiesRandom(Filter filter)
-		{
-			foreach (var index in RandomGenerator.LinearCongruentialGenerator(FilterCount(filter)))
-			{
-				yield return new Entity(filterSignatureToEntityIDs[filter.Signature][index]);
-			}
-		}
-
-		public Entity FilterNthEntity(Filter filter, int index)
-		{
-			return new Entity(filterSignatureToEntityIDs[filter.Signature][index]);
-		}
-
-		public Entity FilterRandomEntity(Filter filter)
-		{
-			var randomIndex = RandomGenerator.Next(FilterCount(filter));
-			return new Entity(filterSignatureToEntityIDs[filter.Signature][randomIndex]);
-		}
-
-		public int FilterCount(Filter filter)
-		{
-			return filterSignatureToEntityIDs[filter.Signature].Count;
-		}
-
-		private void CheckFilter(FilterSignature filterSignature, int entityID)
-		{
-			foreach (var type in filterSignature.Included)
-			{
-				if (!Has(type, entityID))
-				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					return;
-				}
-			}
-
-			foreach (var type in filterSignature.Excluded)
-			{
-				if (Has(type, entityID))
-				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					return;
-				}
-			}
-
-			filterSignatureToEntityIDs[filterSignature].Add(entityID);
-		}
-
-		public void DisableSerialization<TComponent>() where TComponent : unmanaged
-		{
-			TypesWithDisabledSerialization.Add(typeof(TComponent));
-		}
-
-		public void Save(ComponentDepotState state)
-		{
-			foreach (var (type, storage) in storages)
-			{
-				if (!TypesWithDisabledSerialization.Contains(type))
-				{
-					if (!state.StorageStates.ContainsKey(type))
-					{
-						state.StorageStates.Add(type, storage.CreateState());
-					}
-
-					storage.Save(state.StorageStates[type]);
-				}
-			}
-
-			foreach (var (signature, set) in filterSignatureToEntityIDs)
-			{
-				// FIXME: we could cache this
-				if (!signature.Included.Overlaps(TypesWithDisabledSerialization) && !signature.Excluded.Overlaps(TypesWithDisabledSerialization))
-				{
-					if (!state.FilterStates.ContainsKey(signature))
-					{
-						state.FilterStates[signature] = new IndexableSetState<int>(set.Count);
-					}
-					set.Save(state.FilterStates[signature]);
+					storages[i] = other.storages[i].CreateStorage();
 				}
 			}
 		}
 
-		public void Load(ComponentDepotState state)
-		{
-			foreach (var (type, storageState) in state.StorageStates)
-			{
-				storages[type].Load(storageState);
-			}
-
-			foreach (var (signature, setState) in state.FilterStates)
-			{
-				filterSignatureToEntityIDs[signature].Load(setState);
-			}
-		}
+		// this method is used to iterate components of an entity, only for use with a debug inspector
 
 #if DEBUG
-		public IEnumerable<object> Debug_GetAllComponents(int entityID)
+		public object Debug_Get(int entityID, int componentTypeIndex)
 		{
-			foreach (var (type, storage) in storages)
-			{
-				if (storage.Has(entityID))
-				{
-					yield return storage.Debug_Get(entityID);
-				}
-			}
+			return storages[componentTypeIndex].Debug_Get(entityID);
 		}
 
-		public IEnumerable<Entity> Debug_GetEntities(Type componentType)
+		public IEnumerable<int> Debug_GetEntityIDs(int componentTypeIndex)
 		{
-			return singleComponentFilters[componentType].Entities;
-		}
-
-		public IEnumerable<Type> Debug_SearchComponentType(string typeString)
-		{
-			foreach (var type in storages.Keys)
-			{
-				if (type.ToString().ToLower().Contains(typeString.ToLower()))
-				{
-					yield return type;
-				}
-			}
+			return storages[componentTypeIndex].Debug_GetEntityIDs();
 		}
 #endif
 	}

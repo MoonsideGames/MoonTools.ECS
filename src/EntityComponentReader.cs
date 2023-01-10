@@ -9,7 +9,12 @@ namespace MoonTools.ECS
 		internal EntityStorage EntityStorage => World.EntityStorage;
 		internal ComponentDepot ComponentDepot => World.ComponentDepot;
 		internal RelationDepot RelationDepot => World.RelationDepot;
-		protected FilterBuilder FilterBuilder => new FilterBuilder(ComponentDepot);
+		protected FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
+		internal FilterStorage FilterStorage => World.FilterStorage;
+		internal TypeIndices ComponentTypeIndices => World.ComponentTypeIndices;
+		internal TypeIndices RelationTypeIndices => World.RelationTypeIndices;
+		internal TemplateStorage TemplateStorage => World.TemplateStorage;
+		internal ComponentDepot TemplateComponentDepot => World.TemplateComponentDepot;
 
 		public EntityComponentReader(World world)
 		{
@@ -23,7 +28,8 @@ namespace MoonTools.ECS
 
 		protected bool Has<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
-			return ComponentDepot.Has<TComponent>(entity.ID);
+			var storageIndex = ComponentTypeIndices.GetIndex<TComponent>();
+			return EntityStorage.HasComponent(entity.ID, storageIndex);
 		}
 
 		protected bool Some<TComponent>() where TComponent : unmanaged
@@ -38,7 +44,7 @@ namespace MoonTools.ECS
 
 		protected ref readonly TComponent GetSingleton<TComponent>() where TComponent : unmanaged
 		{
-			return ref ComponentDepot.Get<TComponent>();
+			return ref ComponentDepot.GetFirst<TComponent>();
 		}
 
 		protected Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
@@ -46,12 +52,7 @@ namespace MoonTools.ECS
 			return ComponentDepot.GetSingletonEntity<TComponent>();
 		}
 
-		protected bool Exists(in Entity entity)
-		{
-			return EntityStorage.Exists(entity);
-		}
-
-		protected IEnumerable<(Entity, Entity, TRelationKind)> Relations<TRelationKind>() where TRelationKind : unmanaged
+		protected ReverseSpanEnumerator<(Entity, Entity)> Relations<TRelationKind>() where TRelationKind : unmanaged
 		{
 			return RelationDepot.Relations<TRelationKind>();
 		}
@@ -61,13 +62,18 @@ namespace MoonTools.ECS
 			return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
 		}
 
-		// relations go A->B, so given A, will give all outgoing B relations.
-		protected IEnumerable<(Entity, TRelationKind)> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected TRelationKind GetRelationData<TRelationKind>(in Entity a, in Entity b) where TRelationKind : unmanaged
+		{
+			return RelationDepot.Get<TRelationKind>(a, b);
+		}
+
+		// relations go A->B, so given A, will give all entities in outgoing relations of this kind.
+		protected ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.OutRelations<TRelationKind>(entity.ID);
 		}
 
-		protected (Entity, TRelationKind) OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected Entity OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.OutRelationSingleton<TRelationKind>(entity.ID);
 		}
@@ -82,13 +88,13 @@ namespace MoonTools.ECS
 			return RelationDepot.OutRelationCount<TRelationKind>(entity.ID);
 		}
 
-		// Relations go A->B, so given B, will give all incoming A relations.
-		protected IEnumerable<(Entity, TRelationKind)> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		// Relations go A->B, so given B, will give all entities in incoming A relations of this kind.
+		protected ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.InRelations<TRelationKind>(entity.ID);
 		}
 
-		protected (Entity, TRelationKind) InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		protected Entity InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.InRelationSingleton<TRelationKind>(entity.ID);
 		}

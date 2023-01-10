@@ -8,12 +8,13 @@ namespace MoonTools.ECS
 		public abstract void Clear();
 	}
 
-	internal class MessageStorage<TMessage> : MessageStorage where TMessage : struct
+	internal class MessageStorage<TMessage> : MessageStorage where TMessage : unmanaged
 	{
 		private int count = 0;
 		private int capacity = 128;
 		private TMessage[] messages;
-		private Dictionary<int, List<int>> entityToIndices = new Dictionary<int, List<int>>();
+		// duplicating storage here for fast iteration
+		private Dictionary<int, DynamicArray<TMessage>> entityToMessages = new Dictionary<int, DynamicArray<TMessage>>();
 
 		public MessageStorage()
 		{
@@ -29,18 +30,18 @@ namespace MoonTools.ECS
 			}
 
 			messages[count] = message;
-
-			if (message is IHasEntity entityMessage)
-			{
-				if (!entityToIndices.ContainsKey(entityMessage.Entity.ID))
-				{
-					entityToIndices.Add(entityMessage.Entity.ID, new List<int>());
-				}
-
-				entityToIndices[entityMessage.Entity.ID].Add(count);
-			}
-
 			count += 1;
+		}
+
+		public void Add(int entityID, in TMessage message)
+		{
+			if (!entityToMessages.ContainsKey(entityID))
+			{
+				entityToMessages.Add(entityID, new DynamicArray<TMessage>());
+			}
+			entityToMessages[entityID].Add(message);
+
+			Add(message);
 		}
 
 		public bool Some()
@@ -58,31 +59,32 @@ namespace MoonTools.ECS
 			return messages[0];
 		}
 
-		public IEnumerable<TMessage> WithEntity(int entityID)
+		public ReverseSpanEnumerator<TMessage> WithEntity(int entityID)
 		{
-			if (entityToIndices.ContainsKey(entityID))
+			if (entityToMessages.TryGetValue(entityID, out var messages))
 			{
-				foreach (var index in entityToIndices[entityID])
-				{
-					yield return messages[index];
-				}
+				return messages.GetEnumerator();
+			}
+			else
+			{
+				return ReverseSpanEnumerator<TMessage>.Empty;
 			}
 		}
 
 		public ref readonly TMessage FirstWithEntity(int entityID)
 		{
-			return ref messages[entityToIndices[entityID][0]];
+			return ref entityToMessages[entityID][0];
 		}
 
 		public bool SomeWithEntity(int entityID)
 		{
-			return entityToIndices.ContainsKey(entityID) && entityToIndices[entityID].Count > 0;
+			return entityToMessages.ContainsKey(entityID) && entityToMessages[entityID].Count > 0;
 		}
 
 		public override void Clear()
 		{
 			count = 0;
-			foreach (var set in entityToIndices.Values)
+			foreach (var set in entityToMessages.Values)
 			{
 				set.Clear();
 			}

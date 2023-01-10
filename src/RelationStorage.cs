@@ -1,15 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
 	internal abstract class RelationStorage
 	{
-		public abstract RelationStorageState CreateState();
-		public abstract void Save(RelationStorageState state);
-		public abstract void Load(RelationStorageState state);
-		public abstract void OnEntityDestroy(int entityID);
+		public abstract unsafe void Set(int entityA, int entityB, void* relationData);
+		public abstract int GetStorageIndex(int entityA, int entityB);
+		public abstract unsafe void* Get(int relationStorageIndex);
+		public abstract void UnrelateAll(int entityID);
+		public abstract ReverseSpanEnumerator<Entity> OutRelations(int entityID);
+		public abstract RelationStorage CreateStorage();
+		public abstract void Clear();
 	}
 
 	// Relation is the two entities, A related to B.
@@ -17,33 +19,30 @@ namespace MoonTools.ECS
 	internal class RelationStorage<TRelation> : RelationStorage where TRelation : unmanaged
 	{
 		private int count = 0;
-		private Dictionary<Relation, int> indices = new Dictionary<Relation, int>(16);
-		private Relation[] relations = new Relation[16];
+		private Dictionary<(Entity, Entity), int> indices = new Dictionary<(Entity, Entity), int>(16);
+		private (Entity, Entity)[] relations = new (Entity, Entity)[16];
 		private TRelation[] relationDatas = new TRelation[16];
-		private Dictionary<int, IndexableSet<int>> outRelations = new Dictionary<int, IndexableSet<int>>(16);
-		private Dictionary<int, IndexableSet<int>> inRelations = new Dictionary<int, IndexableSet<int>>(16);
-		private Stack<IndexableSet<int>> listPool = new Stack<IndexableSet<int>>();
+		private Dictionary<int, IndexableSet<Entity>> outRelations = new Dictionary<int, IndexableSet<Entity>>(16);
+		private Dictionary<int, IndexableSet<Entity>> inRelations = new Dictionary<int, IndexableSet<Entity>>(16);
+		private Stack<IndexableSet<Entity>> listPool = new Stack<IndexableSet<Entity>>();
 
-		public IEnumerable<(Entity, Entity, TRelation)> All()
+		public ReverseSpanEnumerator<(Entity, Entity)> All()
 		{
-			for (var i = 0; i < count; i += 1)
-			{
-				var relation = relations[i];
-				yield return (relation.A, relation.B, relationDatas[i]);
-			}
+			return new ReverseSpanEnumerator<(Entity, Entity)>(new Span<(Entity, Entity)>(relations, 0, count));
 		}
 
-		public void Set(Relation relation, TRelation relationData)
+		public void Set(in Entity entityA, in Entity entityB, TRelation relationData)
 		{
-			if (indices.ContainsKey(relation))
+			var relation = (entityA, entityB);
+
+			if (indices.TryGetValue(relation, out var index))
 			{
-				var index = indices[relation];
 				relationDatas[index] = relationData;
 				return;
 			}
 
-			var idA = relation.A.ID;
-			var idB = relation.B.ID;
+			var idA = entityA.ID;
+			var idB = entityB.ID;
 
 			if (!outRelations.ContainsKey(idA))
 			{
@@ -69,34 +68,37 @@ namespace MoonTools.ECS
 			count += 1;
 		}
 
-		public bool Has(Relation relation)
+		public TRelation Get(in Entity entityA, in Entity entityB)
+		{
+			return relationDatas[indices[(entityA, entityB)]];
+		}
+
+		public bool Has((Entity, Entity) relation)
 		{
 			return indices.ContainsKey(relation);
 		}
 
-		// FIXME: creating the new Relation in here is slightly deranged
-		public IEnumerable<(Entity, TRelation)> OutRelations(int entityID)
+		public override ReverseSpanEnumerator<Entity> OutRelations(int entityID)
 		{
-			if (outRelations.ContainsKey(entityID))
+			if (outRelations.TryGetValue(entityID, out var entityOutRelations))
 			{
-				foreach (var id in outRelations[entityID])
-				{
-					var relation = new Relation(entityID, id);
-					yield return (relation.B, relationDatas[indices[relation]]);
-				}
+				return entityOutRelations.GetEnumerator();
+			}
+			else
+			{
+				return ReverseSpanEnumerator<Entity>.Empty;
 			}
 		}
 
-		public (Entity, TRelation) OutFirst(int entityID)
+		public Entity OutFirst(int entityID)
 		{
 #if DEBUG
-			if (!outRelations.ContainsKey(entityID))
+			if (!outRelations.ContainsKey(entityID) || outRelations[entityID].Count == 0)
 			{
 				throw new KeyNotFoundException("No out relations to this entity!");
 			}
 #endif
-			var relation = new Relation(entityID, outRelations[entityID][0]);
-			return (relation.B, relationDatas[indices[relation]]);
+			return outRelations[entityID][0];
 		}
 
 		public bool HasOutRelation(int entityID)
@@ -106,32 +108,31 @@ namespace MoonTools.ECS
 
 		public int OutRelationCount(int entityID)
 		{
-			return outRelations.ContainsKey(entityID) ? outRelations[entityID].Count : 0;
+			return outRelations.TryGetValue(entityID, out var entityOutRelations) ? entityOutRelations.Count : 0;
 		}
 
-		public IEnumerable<(Entity, TRelation)> InRelations(int entityID)
+		public ReverseSpanEnumerator<Entity> InRelations(int entityID)
 		{
-			if (inRelations.ContainsKey(entityID))
+			if (inRelations.TryGetValue(entityID, out var entityInRelations))
 			{
-				foreach (var id in inRelations[entityID])
-				{
-					var relation = new Relation(id, entityID);
-					yield return (relation.A, relationDatas[indices[relation]]);
-				}
+				return entityInRelations.GetEnumerator();
+			}
+			else
+			{
+				return ReverseSpanEnumerator<Entity>.Empty;
 			}
 		}
 
-		public (Entity, TRelation) InFirst(int entityID)
+		public Entity InFirst(int entityID)
 		{
 #if DEBUG
-			if (!inRelations.ContainsKey(entityID))
+			if (!inRelations.ContainsKey(entityID) || inRelations[entityID].Count == 0)
 			{
 				throw new KeyNotFoundException("No out relations to this entity!");
 			}
 #endif
 
-			var relation = new Relation(inRelations[entityID][0], entityID);
-			return (relation.A, relationDatas[indices[relation]]);
+			return inRelations[entityID][0];
 		}
 
 		public bool HasInRelation(int entityID)
@@ -141,24 +142,35 @@ namespace MoonTools.ECS
 
 		public int InRelationCount(int entityID)
 		{
-			return inRelations.ContainsKey(entityID) ? inRelations[entityID].Count : 0;
+			return inRelations.TryGetValue(entityID, out var entityInRelations) ? entityInRelations.Count : 0;
 		}
 
-		public bool Remove(Relation relation)
+		public (bool, bool) Remove(in Entity entityA, in Entity entityB)
 		{
-			if (outRelations.ContainsKey(relation.A.ID))
+			var aEmpty = false;
+			var bEmpty = false;
+			var relation = (entityA, entityB);
+
+			if (outRelations.TryGetValue(entityA.ID, out var entityOutRelations))
 			{
-				outRelations[relation.A.ID].Remove(relation.B.ID);
+				entityOutRelations.Remove(entityB.ID);
+				if (outRelations[entityA.ID].Count == 0)
+				{
+					aEmpty = true;
+				}
 			}
 
-			if (inRelations.ContainsKey(relation.B.ID))
+			if (inRelations.TryGetValue(entityB.ID, out var entityInRelations))
 			{
-				inRelations[relation.B.ID].Remove(relation.A.ID);
+				entityInRelations.Remove(entityA.ID);
+				if (inRelations[entityB.ID].Count == 0)
+				{
+					bEmpty = true;
+				}
 			}
 
-			if (indices.ContainsKey(relation))
+			if (indices.TryGetValue(relation, out var index))
 			{
-				var index = indices[relation];
 				var lastElementIndex = count - 1;
 
 				// move an element into the hole
@@ -172,111 +184,93 @@ namespace MoonTools.ECS
 
 				count -= 1;
 				indices.Remove(relation);
-				return true;
 			}
 
-			return false;
+			return (aEmpty, bEmpty);
 		}
 
-		public void UnrelateAll(int entityID)
-		{
-			if (outRelations.ContainsKey(entityID))
-			{
-				foreach (var entityB in outRelations[entityID])
-				{
-					Remove(new Relation(entityID, entityB));
-				}
-
-				ReturnHashSetToPool(outRelations[entityID]);
-				outRelations.Remove(entityID);
-			}
-
-			if (inRelations.ContainsKey(entityID))
-			{
-				foreach (var entityA in inRelations[entityID])
-				{
-					Remove(new Relation(entityA, entityID));
-				}
-
-				ReturnHashSetToPool(inRelations[entityID]);
-				inRelations.Remove(entityID);
-			}
-		}
-
-		public override void OnEntityDestroy(int entityID)
-		{
-			UnrelateAll(entityID);
-		}
-
-		private IndexableSet<int> AcquireHashSetFromPool()
+		private IndexableSet<Entity> AcquireHashSetFromPool()
 		{
 			if (listPool.Count == 0)
 			{
-				listPool.Push(new IndexableSet<int>());
+				listPool.Push(new IndexableSet<Entity>());
 			}
 
 			return listPool.Pop();
 		}
 
-		private void ReturnHashSetToPool(IndexableSet<int> hashSet)
+		private void ReturnHashSetToPool(IndexableSet<Entity> hashSet)
 		{
 			hashSet.Clear();
 			listPool.Push(hashSet);
 		}
 
-		public override RelationStorageState CreateState()
+		// untyped methods used for internal implementation
+
+		public override unsafe void Set(int entityA, int entityB, void* relationData)
 		{
-			return RelationStorageState.Create<TRelation>(count);
+			Set(entityA, entityB, *((TRelation*) relationData));
 		}
 
-		public override void Save(RelationStorageState state)
+		public override int GetStorageIndex(int entityA, int entityB)
 		{
-			ReadOnlySpan<byte> relationBytes = MemoryMarshal.Cast<Relation, byte>(relations);
-
-			if (relationBytes.Length > state.Relations.Length)
-			{
-				Array.Resize(ref state.Relations, relationBytes.Length);
-			}
-			relationBytes.CopyTo(state.Relations);
-
-			ReadOnlySpan<byte> relationDataBytes = MemoryMarshal.Cast<TRelation, byte>(relationDatas);
-
-			if (relationDataBytes.Length > state.RelationDatas.Length)
-			{
-				Array.Resize(ref state.RelationDatas, relationDataBytes.Length);
-			}
-			relationDataBytes.CopyTo(state.RelationDatas);
-
-			state.Count = count;
+			return indices[(entityA, entityB)];
 		}
 
-		public override void Load(RelationStorageState state)
+		public override unsafe void* Get(int relationStorageIndex)
 		{
-			state.Relations.CopyTo(MemoryMarshal.Cast<Relation, byte>(relations));
-			state.RelationDatas.CopyTo(MemoryMarshal.Cast<TRelation, byte>(relationDatas));
+			fixed (void* p = &relations[relationStorageIndex])
+			{
+				return p;
+			}
+		}
 
+		public override void UnrelateAll(int entityID)
+		{
+			if (outRelations.TryGetValue(entityID, out var entityOutRelations))
+			{
+				foreach (var entityB in entityOutRelations)
+				{
+					Remove(entityID, entityB);
+				}
+
+				ReturnHashSetToPool(entityOutRelations);
+				outRelations.Remove(entityID);
+			}
+
+			if (inRelations.TryGetValue(entityID, out var entityInRelations))
+			{
+				foreach (var entityA in entityInRelations)
+				{
+					Remove(entityA, entityID);
+				}
+
+				ReturnHashSetToPool(entityInRelations);
+				inRelations.Remove(entityID);
+			}
+		}
+
+		public override RelationStorage<TRelation> CreateStorage()
+		{
+			return new RelationStorage<TRelation>();
+		}
+
+		public override void Clear()
+		{
+			count = 0;
 			indices.Clear();
-			outRelations.Clear();
-			inRelations.Clear();
-			for (var i = 0; i < state.Count; i += 1)
+
+			foreach (var set in inRelations.Values)
 			{
-				var relation = relations[i];
-				indices[relation] = i;
-
-				if (!outRelations.ContainsKey(relation.A.ID))
-				{
-					outRelations[relation.A.ID] = AcquireHashSetFromPool();
-				}
-				outRelations[relation.A.ID].Add(relation.B.ID);
-
-				if (!inRelations.ContainsKey(relation.B.ID))
-				{
-					inRelations[relation.B.ID] = AcquireHashSetFromPool();
-				}
-				inRelations[relation.B.ID].Add(relation.A.ID);
+				ReturnHashSetToPool(set);
 			}
+			inRelations.Clear();
 
-			count = state.Count;
+			foreach (var set in outRelations.Values)
+			{
+				ReturnHashSetToPool(set);
+			}
+			outRelations.Clear();
 		}
 	}
 }

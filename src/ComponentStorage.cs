@@ -1,17 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
 	internal abstract class ComponentStorage
 	{
-		public abstract bool Has(int entityID);
+		internal abstract unsafe void Set(int entityID, void* component);
 		public abstract bool Remove(int entityID);
-		public abstract object Debug_Get(int entityID);
-		public abstract ComponentStorageState CreateState();
-		public abstract void Save(ComponentStorageState state);
-		public abstract void Load(ComponentStorageState state);
+		public abstract void Clear();
+
+		// used for debugging and template instantiation
+		internal abstract unsafe void* UntypedGet(int entityID);
+		// used to create correctly typed storage on snapshot
+		public abstract ComponentStorage CreateStorage();
+#if DEBUG
+		internal abstract object Debug_Get(int entityID);
+		internal abstract IEnumerable<int> Debug_GetEntityIDs();
+#endif
 	}
 
 	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
@@ -26,22 +31,20 @@ namespace MoonTools.ECS
 			return nextID > 0;
 		}
 
-		public override bool Has(int entityID)
-		{
-			return entityIDToStorageIndex.ContainsKey(entityID);
-		}
-
 		public ref readonly TComponent Get(int entityID)
 		{
 			return ref components[entityIDToStorageIndex[entityID]];
 		}
 
-		public override object Debug_Get(int entityID)
+		internal override unsafe void* UntypedGet(int entityID)
 		{
-			return components[entityIDToStorageIndex[entityID]];
+			fixed (void* p = &components[entityIDToStorageIndex[entityID]])
+			{
+				return p;
+			}
 		}
 
-		public ref readonly TComponent Get()
+		public ref readonly TComponent GetFirst()
 		{
 #if DEBUG
 			if (nextID == 0)
@@ -52,11 +55,8 @@ namespace MoonTools.ECS
 			return ref components[0];
 		}
 
-		// Returns true if the entity already had this component.
-		public bool Set(int entityID, in TComponent component)
+		public void Set(int entityID, in TComponent component)
 		{
-			bool result = true;
-
 			if (!entityIDToStorageIndex.ContainsKey(entityID))
 			{
 				var index = nextID;
@@ -70,21 +70,21 @@ namespace MoonTools.ECS
 
 				entityIDToStorageIndex[entityID] = index;
 				entityIDs[index] = entityID;
-
-				result = false;
 			}
 
 			components[entityIDToStorageIndex[entityID]] = component;
+		}
 
-			return result;
+		internal override unsafe void Set(int entityID, void* component)
+		{
+			Set(entityID, *((TComponent*) component));
 		}
 
 		// Returns true if the entity had this component.
 		public override bool Remove(int entityID)
 		{
-			if (entityIDToStorageIndex.ContainsKey(entityID))
+			if (entityIDToStorageIndex.TryGetValue(entityID, out int storageIndex))
 			{
-				var storageIndex = entityIDToStorageIndex[entityID];
 				entityIDToStorageIndex.Remove(entityID);
 
 				var lastElementIndex = nextID - 1;
@@ -106,7 +106,7 @@ namespace MoonTools.ECS
 			return false;
 		}
 
-		public void Clear()
+		public override void Clear()
 		{
 			nextID = 0;
 			entityIDToStorageIndex.Clear();
@@ -128,43 +128,21 @@ namespace MoonTools.ECS
 			return new Entity(entityIDs[0]);
 		}
 
-		public override ComponentStorageState CreateState()
+		public override ComponentStorage<TComponent> CreateStorage()
 		{
-			return ComponentStorageState.Create<TComponent>(nextID);
+			return new ComponentStorage<TComponent>();
 		}
 
-		public override void Save(ComponentStorageState state)
+#if DEBUG
+		internal override object Debug_Get(int entityID)
 		{
-			ReadOnlySpan<byte> entityIDBytes = MemoryMarshal.Cast<int, byte>(new ReadOnlySpan<int>(entityIDs, 0, nextID));
-
-			if (entityIDBytes.Length > state.EntityIDs.Length)
-			{
-				Array.Resize(ref state.EntityIDs, entityIDBytes.Length);
-			}
-			entityIDBytes.CopyTo(state.EntityIDs);
-
-			ReadOnlySpan<byte> componentBytes = MemoryMarshal.Cast<TComponent, byte>(AllComponents());
-			if (componentBytes.Length > state.Components.Length)
-			{
-				Array.Resize(ref state.Components, componentBytes.Length);
-			}
-			componentBytes.CopyTo(state.Components);
-
-			state.Count = nextID;
+			return components[entityIDToStorageIndex[entityID]];
 		}
 
-		public override void Load(ComponentStorageState state)
+		internal override IEnumerable<int> Debug_GetEntityIDs()
 		{
-			state.EntityIDs.CopyTo(MemoryMarshal.Cast<int, byte>(entityIDs));
-			state.Components.CopyTo(MemoryMarshal.Cast<TComponent, byte>(components));
-
-			entityIDToStorageIndex.Clear();
-			for (var i = 0; i < state.Count; i += 1)
-			{
-				entityIDToStorageIndex[entityIDs[i]] = i;
-			}
-
-			nextID = state.Count;
+			return entityIDToStorageIndex.Keys;
 		}
+#endif
 	}
 }

@@ -10,6 +10,9 @@ namespace MoonTools.ECS
 		private Dictionary<FilterSignature, IndexableSet<Entity>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<Entity>>();
 		private Dictionary<int, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
 
+		private Dictionary<FilterSignature, Action<Entity>> addCallbacks = new Dictionary<FilterSignature, Action<Entity>>();
+		private Dictionary<FilterSignature, Action<Entity>> removeCallbacks = new Dictionary<FilterSignature, Action<Entity>>();
+
 		public FilterStorage(EntityStorage entityStorage, TypeIndices componentTypeIndices)
 		{
 			EntityStorage = entityStorage;
@@ -116,6 +119,10 @@ namespace MoonTools.ECS
 				if (!EntityStorage.HasComponent(entityID, type))
 				{
 					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					{
+						removeCallback(entityID);
+					}
 					return;
 				}
 			}
@@ -125,11 +132,19 @@ namespace MoonTools.ECS
 				if (EntityStorage.HasComponent(entityID, type))
 				{
 					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					{
+						removeCallback(entityID);
+					}
 					return;
 				}
 			}
 
 			filterSignatureToEntityIDs[filterSignature].Add(entityID);
+			if (addCallbacks.TryGetValue(filterSignature, out var addCallback))
+			{
+				addCallback(entityID);
+			}
 		}
 
 		public void RemoveEntity(int entityID, int componentTypeIndex)
@@ -139,8 +154,22 @@ namespace MoonTools.ECS
 				foreach (var filterSignature in filterSignatures)
 				{
 					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
+					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					{
+						removeCallback(entityID);
+					}
 				}
 			}
+		}
+
+		public void RegisterAddCallback(FilterSignature filterSignature, Action<Entity> callback)
+		{
+			addCallbacks.Add(filterSignature, callback);
+		}
+
+		public void RegisterRemoveCallback(FilterSignature filterSignature, Action<Entity> callback)
+		{
+			removeCallbacks.Add(filterSignature, callback);
 		}
 	}
 }

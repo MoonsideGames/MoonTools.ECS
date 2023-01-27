@@ -23,5 +23,15 @@ namespace MoonTools.ECS
 
 		// WARNING: this WILL crash if the index is out of range!
 		public Entity NthEntity(int index) => FilterStorage.FilterNthEntity(Signature, index);
+
+		public void RegisterAddCallback(Action<Entity> callback)
+		{
+			FilterStorage.RegisterAddCallback(Signature, callback);
+		}
+
+		public void RegisterRemoveCallback(Action<Entity> callback)
+		{
+			FilterStorage.RegisterRemoveCallback(Signature, callback);
+		}
 	}
 }

@@ -38,12 +38,12 @@ namespace MoonTools.ECS
 				throw new InvalidOperationException("This entity is not valid!");
 			}
 #endif
+			ComponentDepot.Set<TComponent>(entity.ID, component);
+
 			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
 			{
 				FilterStorage.Check<TComponent>(entity.ID);
 			}
-
-			ComponentDepot.Set<TComponent>(entity.ID, component);
 		}
 
 		public Template CreateTemplate()

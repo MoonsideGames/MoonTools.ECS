@@ -118,10 +118,12 @@ namespace MoonTools.ECS
 			{
 				if (!EntityStorage.HasComponent(entityID, type))
 				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					if (filterSignatureToEntityIDs[filterSignature].Remove(entityID))
 					{
-						removeCallback(entityID);
+						if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+						{
+							removeCallback(entityID);
+						}
 					}
 					return;
 				}
@@ -131,10 +133,12 @@ namespace MoonTools.ECS
 			{
 				if (EntityStorage.HasComponent(entityID, type))
 				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					if (filterSignatureToEntityIDs[filterSignature].Remove(entityID))
 					{
-						removeCallback(entityID);
+						if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+						{
+							removeCallback(entityID);
+						}
 					}
 					return;
 				}
@@ -153,10 +157,12 @@ namespace MoonTools.ECS
 			{
 				foreach (var filterSignature in filterSignatures)
 				{
-					filterSignatureToEntityIDs[filterSignature].Remove(entityID);
-					if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+					if (filterSignatureToEntityIDs[filterSignature].Remove(entityID))
 					{
-						removeCallback(entityID);
+						if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
+						{
+							removeCallback(entityID);
+						}
 					}
 				}
 			}

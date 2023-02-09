@@ -128,7 +128,7 @@ namespace MoonTools.ECS
 #if DEBUG
 			if (!inRelations.ContainsKey(entityID) || inRelations[entityID].Count == 0)
 			{
-				throw new KeyNotFoundException("No out relations to this entity!");
+				throw new KeyNotFoundException("No in relations to this entity!");
 			}
 #endif
 

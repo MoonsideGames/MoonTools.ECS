@@ -97,6 +97,7 @@ namespace MoonTools.ECS
 			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
 			{
 				RelationDepot.UnrelateAll(entity.ID, relationTypeIndex);
+				EntityStorage.RemoveRelation(entity.ID, relationTypeIndex);
 			}
 
 			EntityStorage.Destroy(entity);

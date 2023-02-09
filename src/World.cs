@@ -78,6 +78,14 @@ namespace MoonTools.ECS
 			MessageDepot.Add(message);
 		}
 
+		public void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
+		{
+			RelationDepot.Set(entityA, entityB, relationData);
+			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
+			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
+			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
+		}
+
 		public void Destroy(in Entity entity)
 		{
 			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))

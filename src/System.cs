@@ -69,13 +69,7 @@ namespace MoonTools.ECS
 			MessageDepot.Add(entity.ID, message);
 		}
 
-		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
-		{
-			RelationDepot.Set(entityA, entityB, relationData);
-			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
-			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
-			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
-		}
+		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged => World.Relate(entityA, entityB, relationData);
 
 		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
 		{

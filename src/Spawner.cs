@@ -1,12 +1,9 @@
 namespace MoonTools.ECS
 {
-	public abstract class Spawner
+	public abstract class Spawner : EntityComponentReader
 	{
-		private World World;
-
-		public Spawner(World world)
+		public Spawner(World world) : base(world)
 		{
-			World = world;
 		}
 
 		protected Entity CreateEntity() => World.CreateEntity();

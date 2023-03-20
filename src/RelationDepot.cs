@@ -76,6 +76,11 @@ namespace MoonTools.ECS
 			return Lookup<TRelationKind>().OutFirst(entityID);
 		}
 
+		public Entity NthOutRelation<TRelationKind>(int entityID, int n) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().OutNth(entityID, n);
+		}
+
 		public int OutRelationCount<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().OutRelationCount(entityID);
@@ -89,6 +94,11 @@ namespace MoonTools.ECS
 		public ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(int entityID) where TRelationKind : unmanaged
 		{
 			return Lookup<TRelationKind>().InRelations(entityID);
+		}
+
+		public Entity NthInRelation<TRelationKind>(int entityID, int n) where TRelationKind : unmanaged
+		{
+			return Lookup<TRelationKind>().InNth(entityID, n);
 		}
 
 		public Entity InRelationSingleton<TRelationKind>(int entityID) where TRelationKind : unmanaged

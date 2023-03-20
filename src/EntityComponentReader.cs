@@ -78,6 +78,12 @@ namespace MoonTools.ECS
 			return RelationDepot.OutRelationSingleton<TRelationKind>(entity.ID);
 		}
 
+		// NOTE: this WILL crash if at least n + 1 relations do not exist!
+		protected Entity NthOutRelation<TRelationKind>(in Entity entity, int n) where TRelationKind : unmanaged
+		{
+			return RelationDepot.NthOutRelation<TRelationKind>(entity.ID, n);
+		}
+
 		protected bool HasOutRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.HasOutRelation<TRelationKind>(entity.ID);
@@ -97,6 +103,12 @@ namespace MoonTools.ECS
 		protected Entity InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
 		{
 			return RelationDepot.InRelationSingleton<TRelationKind>(entity.ID);
+		}
+
+		// NOTE: this WILL crash if at least n + 1 relations do not exist!
+		protected Entity NthInRelation<TRelationKind>(in Entity entity, int n) where TRelationKind : unmanaged
+		{
+			return RelationDepot.NthInRelation<TRelationKind>(entity.ID, n);
 		}
 
 		protected bool HasInRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged

@@ -92,13 +92,18 @@ namespace MoonTools.ECS
 
 		public Entity OutFirst(int entityID)
 		{
+			return OutNth(entityID, 0);
+		}
+
+		public Entity OutNth(int entityID, int n)
+		{
 #if DEBUG
 			if (!outRelations.ContainsKey(entityID) || outRelations[entityID].Count == 0)
 			{
 				throw new KeyNotFoundException("No out relations to this entity!");
 			}
 #endif
-			return outRelations[entityID][0];
+			return outRelations[entityID][n];
 		}
 
 		public bool HasOutRelation(int entityID)
@@ -125,6 +130,11 @@ namespace MoonTools.ECS
 
 		public Entity InFirst(int entityID)
 		{
+			return InNth(entityID, 0);
+		}
+
+		public Entity InNth(int entityID, int n)
+		{
 #if DEBUG
 			if (!inRelations.ContainsKey(entityID) || inRelations[entityID].Count == 0)
 			{
@@ -132,7 +142,7 @@ namespace MoonTools.ECS
 			}
 #endif
 
-			return inRelations[entityID][0];
+			return inRelations[entityID][n];
 		}
 
 		public bool HasInRelation(int entityID)

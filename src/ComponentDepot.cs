@@ -31,7 +31,7 @@ namespace MoonTools.ECS
 		{
 			var storageIndex = ComponentTypeIndices.GetIndex<TComponent>();
 			// TODO: is there some way to avoid this null check?
-			if (storages[storageIndex] == null)
+			if (storageIndex >= storages.Length || storages[storageIndex] == null)
 			{
 				Register<TComponent>(storageIndex);
 			}

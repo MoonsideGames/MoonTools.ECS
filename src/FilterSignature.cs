@@ -21,7 +21,25 @@ namespace MoonTools.ECS
 
 		public bool Equals(FilterSignature other)
 		{
-			return Included.SetEquals(other.Included) && Excluded.SetEquals(other.Excluded);
+			// workaround for HashSet<T>.SetEquals generating garbage
+			// maybe fixed in .NET 8?
+			foreach (var included in Included)
+			{
+				if (!other.Included.Contains(included))
+				{
+					return false;
+				}
+			}
+
+			foreach (var excluded in Excluded)
+			{
+				if (!other.Excluded.Contains(excluded))
+				{
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 		public override int GetHashCode()

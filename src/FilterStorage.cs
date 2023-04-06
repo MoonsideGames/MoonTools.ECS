@@ -54,9 +54,12 @@ namespace MoonTools.ECS
 			return filterSignatureToEntityIDs[filterSignature].GetEnumerator();
 		}
 
-		public LinearCongruentialEnumerator FilterEntitiesRandom(FilterSignature filterSignature)
+		public RandomEntityEnumerator FilterEntitiesRandom(FilterSignature filterSignature)
 		{
-			return RandomGenerator.LinearCongruentialGenerator(FilterCount(filterSignature));
+			return new RandomEntityEnumerator(
+				this,
+				filterSignature,
+				RandomGenerator.LinearCongruentialGenerator(FilterCount(filterSignature)));
 		}
 
 		public Entity FilterNthEntity(FilterSignature filterSignature, int index)
@@ -177,5 +180,27 @@ namespace MoonTools.ECS
 		{
 			removeCallbacks.Add(filterSignature, callback);
 		}
+	}
+
+	public ref struct RandomEntityEnumerator
+	{
+		public RandomEntityEnumerator GetEnumerator() => this;
+
+		private FilterStorage FilterStorage;
+		private FilterSignature FilterSignature;
+		private LinearCongruentialEnumerator LinearCongruentialEnumerator;
+
+		internal RandomEntityEnumerator(
+			FilterStorage filterStorage,
+			FilterSignature filterSignature,
+			LinearCongruentialEnumerator linearCongruentialEnumerator)
+		{
+			FilterStorage = filterStorage;
+			FilterSignature = filterSignature;
+			LinearCongruentialEnumerator = linearCongruentialEnumerator;
+		}
+
+		public bool MoveNext() => LinearCongruentialEnumerator.MoveNext();
+		public Entity Current => FilterStorage.FilterNthEntity(FilterSignature, LinearCongruentialEnumerator.Current);
 	}
 }

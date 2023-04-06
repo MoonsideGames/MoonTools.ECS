@@ -15,7 +15,7 @@ namespace MoonTools.ECS
 		}
 
 		public ReverseSpanEnumerator<Entity> Entities => FilterStorage.FilterEntities(Signature);
-		public LinearCongruentialEnumerator EntitiesInRandomOrder => FilterStorage.FilterEntitiesRandom(Signature);
+		public RandomEntityEnumerator EntitiesInRandomOrder => FilterStorage.FilterEntitiesRandom(Signature);
 		public Entity RandomEntity => FilterStorage.FilterRandomEntity(Signature);
 
 		public int Count => FilterStorage.FilterCount(Signature);

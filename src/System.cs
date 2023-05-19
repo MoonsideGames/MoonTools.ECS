@@ -19,8 +19,9 @@ namespace MoonTools.ECS
 		{
 			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
 			{
-				ComponentDepot.Remove<TComponent>(entity.ID);
+				// Run filter storage update first so that the entity state is still valid in the remove callback.
 				FilterStorage.Check<TComponent>(entity.ID);
+				ComponentDepot.Remove<TComponent>(entity.ID);
 			}
 		}
 

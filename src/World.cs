@@ -90,8 +90,9 @@ namespace MoonTools.ECS
 		{
 			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
 			{
-				ComponentDepot.Remove(entity.ID, componentTypeIndex);
+				// Run filter storage update first so that the entity state is still valid in the remove callback.
 				FilterStorage.RemoveEntity(entity.ID, componentTypeIndex);
+				ComponentDepot.Remove(entity.ID, componentTypeIndex);
 			}
 
 			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))

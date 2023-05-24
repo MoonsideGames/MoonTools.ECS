@@ -1,34 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
-	public abstract class System : EntityComponentReader
+	public abstract class System : Manipulator
 	{
 		internal MessageDepot MessageDepot => World.MessageDepot;
 
 		public System(World world) : base(world) { }
 
 		public abstract void Update(TimeSpan delta);
-
-		protected Entity CreateEntity() => World.CreateEntity();
-
-		protected void Set<TComponent>(in Entity entity, in TComponent component) where TComponent : unmanaged => World.Set<TComponent>(entity, component);
-
-		protected void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
-		{
-			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
-			{
-				// Run filter storage update first so that the entity state is still valid in the remove callback.
-				FilterStorage.Check<TComponent>(entity.ID);
-				ComponentDepot.Remove<TComponent>(entity.ID);
-			}
-		}
-
-		protected void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged => World.Set<TComponent>(template, component);
-
-		// This feature is EXPERIMENTAL. USe at your own risk!!
-		protected Entity Instantiate(in Template template) => World.Instantiate(template);
 
 		protected ReadOnlySpan<TMessage> ReadMessages<TMessage>() where TMessage : unmanaged
 		{
@@ -60,39 +40,8 @@ namespace MoonTools.ECS
 			return MessageDepot.SomeWithEntity<TMessage>(entity.ID);
 		}
 
-		protected void Send<TMessage>(in TMessage message) where TMessage : unmanaged
-		{
-			MessageDepot.Add(message);
-		}
+		protected void Send<TMessage>(in TMessage message) where TMessage : unmanaged => World.Send(message);
 
-		protected void Send<TMessage>(in Entity entity, in TMessage message) where TMessage : unmanaged
-		{
-			MessageDepot.Add(entity.ID, message);
-		}
-
-		protected void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged => World.Relate(entityA, entityB, relationData);
-
-		protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
-		{
-			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(entityA, entityB);
-
-			if (aEmpty)
-			{
-				EntityStorage.RemoveRelation(entityA.ID, RelationTypeIndices.GetIndex<TRelationKind>());
-			}
-
-			if (bEmpty)
-			{
-				EntityStorage.RemoveRelation(entityB.ID, RelationTypeIndices.GetIndex<TRelationKind>());
-			}
-		}
-
-		protected void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			RelationDepot.UnrelateAll<TRelationKind>(entity.ID);
-			EntityStorage.RemoveRelation(entity.ID, RelationTypeIndices.GetIndex<TRelationKind>());
-		}
-
-		protected void Destroy(in Entity entity) => World.Destroy(entity);
+		protected void Send<TMessage>(in Entity entity, in TMessage message) where TMessage : unmanaged => World.Send(entity, message);
 	}
 }

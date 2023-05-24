@@ -13,7 +13,6 @@ namespace MoonTools.ECS
 		internal readonly FilterStorage FilterStorage;
 		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
 
-		internal readonly TemplateStorage TemplateStorage = new TemplateStorage();
 		internal readonly ComponentDepot TemplateComponentDepot;
 
 		public World()
@@ -46,36 +45,14 @@ namespace MoonTools.ECS
 			}
 		}
 
-		public Template CreateTemplate()
+		public void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
-			return TemplateStorage.Create();
-		}
-
-		public void Set<TComponent>(in Template template, in TComponent component) where TComponent : unmanaged
-		{
-			var componentTypeIndex = ComponentTypeIndices.GetIndex<TComponent>();
-			TemplateStorage.SetComponent(template.ID, componentTypeIndex);
-			TemplateComponentDepot.Set(template.ID, component);
-			ComponentDepot.Register<TComponent>(componentTypeIndex);
-		}
-
-		public unsafe Entity Instantiate(in Template template)
-		{
-			var entity = EntityStorage.Create();
-
-			foreach (var componentTypeIndex in TemplateStorage.ComponentTypeIndices(template.ID))
+			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
 			{
-				EntityStorage.SetComponent(entity.ID, componentTypeIndex);
-				FilterStorage.Check(entity.ID, componentTypeIndex);
-				ComponentDepot.Set(entity.ID, componentTypeIndex, TemplateComponentDepot.UntypedGet(template.ID, componentTypeIndex));
+				// Run filter storage update first so that the entity state is still valid in the remove callback.
+				FilterStorage.Check<TComponent>(entity.ID);
+				ComponentDepot.Remove<TComponent>(entity.ID);
 			}
-
-			return entity;
-		}
-
-		public void Send<TMessage>(in TMessage message) where TMessage : unmanaged
-		{
-			MessageDepot.Add(message);
 		}
 
 		public void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
@@ -84,6 +61,37 @@ namespace MoonTools.ECS
 			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
 			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
 			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
+		}
+
+		public void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
+		{
+			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(entityA, entityB);
+
+			if (aEmpty)
+			{
+				EntityStorage.RemoveRelation(entityA.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+			}
+
+			if (bEmpty)
+			{
+				EntityStorage.RemoveRelation(entityB.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+			}
+		}
+
+		public void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+		{
+			RelationDepot.UnrelateAll<TRelationKind>(entity.ID);
+			EntityStorage.RemoveRelation(entity.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+		}
+
+		public void Send<TMessage>(in TMessage message) where TMessage : unmanaged
+		{
+			MessageDepot.Add(message);
+		}
+
+		public void Send<TMessage>(in Entity entity, in TMessage message) where TMessage : unmanaged
+		{
+			MessageDepot.Add(entity.ID, message);
 		}
 
 		public void Destroy(in Entity entity)

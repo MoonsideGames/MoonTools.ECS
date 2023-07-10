@@ -103,7 +103,17 @@ namespace MoonTools.ECS
 
 		public void CreateMissingStorages(ComponentDepot other)
 		{
-			for (var i = 0; i < ComponentTypeIndices.Count; i += 1)
+			while (other.ComponentTypeIndices.Count >= storages.Length)
+			{
+				Array.Resize(ref storages, storages.Length * 2);
+			}
+
+			while (other.ComponentTypeIndices.Count >= other.storages.Length)
+			{
+				Array.Resize(ref other.storages, other.storages.Length * 2);
+			}
+
+			for (var i = 0; i < other.ComponentTypeIndices.Count; i += 1)
 			{
 				if (storages[i] == null && other.storages[i] != null)
 				{

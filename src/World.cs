@@ -1,11 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace MoonTools.ECS
 {
 	public class World
 	{
-		internal readonly TypeIndices ComponentTypeIndices = new TypeIndices();
-		internal readonly TypeIndices RelationTypeIndices = new TypeIndices();
+		internal readonly static TypeIndices ComponentTypeIndices = new TypeIndices();
+		internal readonly static TypeIndices RelationTypeIndices = new TypeIndices();
 		internal readonly EntityStorage EntityStorage = new EntityStorage();
 		internal readonly ComponentDepot ComponentDepot;
 		internal readonly MessageDepot MessageDepot = new MessageDepot();
@@ -23,9 +24,19 @@ namespace MoonTools.ECS
 			TemplateComponentDepot = new ComponentDepot(ComponentTypeIndices);
 		}
 
-		public Entity CreateEntity()
+		public Entity CreateEntity(string tag = "")
 		{
-			return EntityStorage.Create();
+			return EntityStorage.Create(tag);
+		}
+
+		public void Tag(Entity entity, string tag)
+		{
+			EntityStorage.Tag(entity, tag);
+		}
+
+		public string GetTag(Entity entity)
+		{
+			return EntityStorage.Tag(entity);
 		}
 
 		public void Set<TComponent>(Entity entity, in TComponent component) where TComponent : unmanaged
@@ -45,6 +56,17 @@ namespace MoonTools.ECS
 			}
 		}
 
+		// untyped version for Transfer
+		internal unsafe void Set(Entity entity, int componentTypeIndex, void* component)
+		{
+			ComponentDepot.Set(entity.ID, componentTypeIndex, component);
+
+			if (EntityStorage.SetComponent(entity.ID, componentTypeIndex))
+			{
+				FilterStorage.Check(entity.ID, componentTypeIndex);
+			}
+		}
+
 		public void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
 		{
 			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
@@ -59,6 +81,14 @@ namespace MoonTools.ECS
 		{
 			RelationDepot.Set(entityA, entityB, relationData);
 			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
+			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
+			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
+		}
+
+		// untyped version for Transfer
+		internal unsafe void Relate(Entity entityA, Entity entityB, int relationTypeIndex, void* relationData)
+		{
+			RelationDepot.Set(entityA, entityB, relationTypeIndex, relationData);
 			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
 			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
 		}
@@ -118,9 +148,63 @@ namespace MoonTools.ECS
 			MessageDepot.Clear();
 		}
 
-		public Snapshot CreateSnapshot()
+		private Dictionary<int, int> WorldToTransferID = new Dictionary<int, int>();
+
+		// FIXME: there's probably a better way to handle Filters so they are not world-bound
+		public unsafe void Transfer(World other, Filter filter, Filter otherFilter)
 		{
-			return new Snapshot(this);
+			WorldToTransferID.Clear();
+			other.ComponentDepot.CreateMissingStorages(ComponentDepot);
+			other.RelationDepot.CreateMissingStorages(RelationDepot);
+
+			// destroy all entities matching the filter
+			foreach (var entity in otherFilter.Entities)
+			{
+				other.Destroy(entity);
+			}
+
+			// create entities
+			foreach (var entity in filter.Entities)
+			{
+				var otherWorldEntity = other.CreateEntity(GetTag(entity));
+				WorldToTransferID.Add(entity.ID, otherWorldEntity.ID);
+			}
+
+			// set relations before components so filters don't freak out
+			foreach (var entity in filter.Entities)
+			{
+				var otherWorldEntityA = WorldToTransferID[entity.ID];
+
+				foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
+				{
+					foreach (var entityB in RelationDepot.OutRelations(entity.ID, relationTypeIndex))
+					{
+						var storageIndex = RelationDepot.GetStorageIndex(relationTypeIndex, entity.ID, entityB);
+
+						int otherWorldEntityB;
+						if (WorldToTransferID.TryGetValue(entityB, out otherWorldEntityB))
+						{
+							other.Relate(otherWorldEntityA, otherWorldEntityB, relationTypeIndex, RelationDepot.Get(relationTypeIndex, storageIndex));
+						}
+						else
+						{
+							// related entity is not in the filter
+							throw new Exception($"Missing transfer entity! {EntityStorage.Tag(entity.ID)} related to {EntityStorage.Tag(entityB.ID)}");
+						}
+					}
+				}
+			}
+
+			// set components
+			foreach (var entity in filter.Entities)
+			{
+				var otherWorldEntity = WorldToTransferID[entity.ID];
+
+				foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+				{
+					other.Set(otherWorldEntity, componentTypeIndex, ComponentDepot.UntypedGet(entity.ID, componentTypeIndex));
+				}
+			}
 		}
 	}
 }

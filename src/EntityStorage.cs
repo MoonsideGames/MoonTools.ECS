@@ -15,17 +15,24 @@ namespace MoonTools.ECS
 
 		public int Count => nextID - availableIDs.Count;
 
-		public Entity Create()
+		public Dictionary<int, string> Tags = new Dictionary<int, string>();
+
+		public Entity Create(string tag)
 		{
 			var entity = new Entity(NextID());
+
 			if (!EntityToComponentTypeIndices.ContainsKey(entity.ID))
 			{
 				EntityToComponentTypeIndices.Add(entity.ID, new HashSet<int>());
 			}
+
 			if (!EntityToRelationTypeIndices.ContainsKey(entity.ID))
 			{
 				EntityToRelationTypeIndices.Add(entity.ID, new HashSet<int>());
 			}
+
+			Tags[entity.ID] = tag;
+
 			return entity;
 		}
 
@@ -34,10 +41,16 @@ namespace MoonTools.ECS
 			return Taken(entity.ID);
 		}
 
+		public void Tag(in Entity entity, string tag)
+		{
+			Tags[entity.ID] = tag;
+		}
+
 		public void Destroy(in Entity entity)
 		{
 			EntityToComponentTypeIndices[entity.ID].Clear();
 			EntityToRelationTypeIndices[entity.ID].Clear();
+			Tags.Remove(entity.ID);
 			Release(entity.ID);
 		}
 
@@ -66,6 +79,11 @@ namespace MoonTools.ECS
 		public void RemoveRelation(int entityId, int relationIndex)
 		{
 			EntityToRelationTypeIndices[entityId].Remove(relationIndex);
+		}
+
+		public string Tag(int entityID)
+		{
+			return Tags[entityID];
 		}
 
 		public HashSet<int> ComponentTypeIndices(int entityID)

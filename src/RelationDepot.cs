@@ -156,7 +156,17 @@ namespace MoonTools.ECS
 
 		public void CreateMissingStorages(RelationDepot other)
 		{
-			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
+			while (other.RelationTypeIndices.Count >= storages.Length)
+			{
+				Array.Resize(ref storages, storages.Length * 2);
+			}
+
+			while (other.RelationTypeIndices.Count >= other.storages.Length)
+			{
+				Array.Resize(ref other.storages, other.storages.Length * 2);
+			}
+
+			for (var i = 0; i < other.RelationTypeIndices.Count; i += 1)
 			{
 				if (storages[i] == null && other.storages[i] != null)
 				{

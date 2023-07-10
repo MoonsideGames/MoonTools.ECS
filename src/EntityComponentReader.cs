@@ -20,6 +20,11 @@ namespace MoonTools.ECS
 			World = world;
 		}
 
+		protected string GetTag(in Entity entity)
+		{
+			return World.GetTag(entity);
+		}
+
 		protected ReadOnlySpan<TComponent> ReadComponents<TComponent>() where TComponent : unmanaged
 		{
 			return ComponentDepot.ReadComponents<TComponent>();

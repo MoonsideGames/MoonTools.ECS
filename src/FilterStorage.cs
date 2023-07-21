@@ -171,6 +171,15 @@ namespace MoonTools.ECS
 			}
 		}
 
+		// used by World.Clear, ignores callbacks
+		public void Clear()
+		{
+			foreach (var (filterSignature, entityIDs) in filterSignatureToEntityIDs)
+			{
+				entityIDs.Clear();
+			}
+		}
+
 		public void RegisterAddCallback(FilterSignature filterSignature, Action<Entity> callback)
 		{
 			addCallbacks.Add(filterSignature, callback);

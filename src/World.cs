@@ -14,14 +14,11 @@ namespace MoonTools.ECS
 		internal readonly FilterStorage FilterStorage;
 		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
 
-		internal readonly ComponentDepot TemplateComponentDepot;
-
 		public World()
 		{
 			ComponentDepot = new ComponentDepot(ComponentTypeIndices);
 			RelationDepot = new RelationDepot(RelationTypeIndices);
 			FilterStorage = new FilterStorage(EntityStorage, ComponentTypeIndices);
-			TemplateComponentDepot = new ComponentDepot(ComponentTypeIndices);
 		}
 
 		public Entity CreateEntity(string tag = "")
@@ -146,6 +143,15 @@ namespace MoonTools.ECS
 		public void FinishUpdate()
 		{
 			MessageDepot.Clear();
+		}
+
+		public void Clear()
+		{
+			EntityStorage.Clear();
+			MessageDepot.Clear();
+			RelationDepot.Clear();
+			ComponentDepot.Clear();
+			FilterStorage.Clear();
 		}
 
 		private Dictionary<int, int> WorldToTransferID = new Dictionary<int, int>();

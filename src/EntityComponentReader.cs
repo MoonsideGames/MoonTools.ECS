@@ -13,7 +13,6 @@ namespace MoonTools.ECS
 		internal FilterStorage FilterStorage => World.FilterStorage;
 		internal TypeIndices ComponentTypeIndices => World.ComponentTypeIndices;
 		internal TypeIndices RelationTypeIndices => World.RelationTypeIndices;
-		internal ComponentDepot TemplateComponentDepot => World.TemplateComponentDepot;
 
 		public EntityComponentReader(World world)
 		{

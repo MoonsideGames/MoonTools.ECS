@@ -145,7 +145,7 @@ namespace MoonTools.ECS
 
 		public void Clear()
 		{
-			for (var i = 0; i < RelationTypeIndices.Count; i += 1)
+			for (var i = 0; i < storages.Length; i += 1)
 			{
 				if (storages[i] != null)
 				{

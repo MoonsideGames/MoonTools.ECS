@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -8,7 +9,7 @@ namespace MoonTools.ECS
 		internal FilterSignature Signature;
 		private FilterStorage FilterStorage;
 
-		internal Filter(FilterStorage filterStorage, HashSet<int> included, HashSet<int> excluded)
+		internal Filter(FilterStorage filterStorage, IndexableSet<int> included, IndexableSet<int> excluded)
 		{
 			FilterStorage = filterStorage;
 			Signature = new FilterSignature(included, excluded);

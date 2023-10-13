@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -9,26 +12,35 @@ namespace MoonTools.ECS
 		public abstract int GetStorageIndex(int entityA, int entityB);
 		public abstract unsafe void* Get(int relationStorageIndex);
 		public abstract void UnrelateAll(int entityID);
-		public abstract ReverseSpanEnumerator<Entity> OutRelations(int entityID);
+		public abstract ReverseSpanEnumerator<(Entity, Entity)> All();
 		public abstract RelationStorage CreateStorage();
 		public abstract void Clear();
 	}
 
 	// Relation is the two entities, A related to B.
 	// TRelation is the data attached to the relation.
-	internal class RelationStorage<TRelation> : RelationStorage where TRelation : unmanaged
+	internal unsafe class RelationStorage<TRelation> : RelationStorage, IDisposable where TRelation : unmanaged
 	{
 		private int count = 0;
+		private int capacity = 16;
+		private (Entity, Entity)* relations;
+		private TRelation* relationDatas;
 		private Dictionary<(Entity, Entity), int> indices = new Dictionary<(Entity, Entity), int>(16);
-		private (Entity, Entity)[] relations = new (Entity, Entity)[16];
-		private TRelation[] relationDatas = new TRelation[16];
 		private Dictionary<int, IndexableSet<Entity>> outRelations = new Dictionary<int, IndexableSet<Entity>>(16);
 		private Dictionary<int, IndexableSet<Entity>> inRelations = new Dictionary<int, IndexableSet<Entity>>(16);
 		private Stack<IndexableSet<Entity>> listPool = new Stack<IndexableSet<Entity>>();
 
-		public ReverseSpanEnumerator<(Entity, Entity)> All()
+		private bool disposed;
+
+		public RelationStorage()
 		{
-			return new ReverseSpanEnumerator<(Entity, Entity)>(new Span<(Entity, Entity)>(relations, 0, count));
+			relations = ((Entity, Entity)*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<(Entity, Entity)>()));
+			relationDatas = (TRelation*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TRelation>()));
+		}
+
+		public override ReverseSpanEnumerator<(Entity, Entity)> All()
+		{
+			return new ReverseSpanEnumerator<(Entity, Entity)>(new Span<(Entity, Entity)>(relations, count));
 		}
 
 		public void Set(in Entity entityA, in Entity entityB, TRelation relationData)
@@ -56,10 +68,11 @@ namespace MoonTools.ECS
 			}
 			inRelations[idB].Add(idA);
 
-			if (count >= relationDatas.Length)
+			if (count >= capacity)
 			{
-				Array.Resize(ref relations, relations.Length * 2);
-				Array.Resize(ref relationDatas, relationDatas.Length * 2);
+				capacity *= 2;
+				relations = ((Entity, Entity)*) NativeMemory.Realloc(relations, (nuint) (capacity * Unsafe.SizeOf<(Entity, Entity)>()));
+				relationDatas = (TRelation*) NativeMemory.Realloc(relationDatas, (nuint) (capacity * Unsafe.SizeOf<TRelation>()));
 			}
 
 			relations[count] = relation;
@@ -78,7 +91,7 @@ namespace MoonTools.ECS
 			return indices.ContainsKey(relation);
 		}
 
-		public override ReverseSpanEnumerator<Entity> OutRelations(int entityID)
+		public ReverseSpanEnumerator<Entity> OutRelations(int entityID)
 		{
 			if (outRelations.TryGetValue(entityID, out var entityOutRelations))
 			{
@@ -219,7 +232,7 @@ namespace MoonTools.ECS
 
 		public override unsafe void Set(int entityA, int entityB, void* relationData)
 		{
-			Set(entityA, entityB, *((TRelation*) relationData));
+			Set(entityA, entityB, *(TRelation*) relationData);
 		}
 
 		public override int GetStorageIndex(int entityA, int entityB)
@@ -229,10 +242,7 @@ namespace MoonTools.ECS
 
 		public override unsafe void* Get(int relationStorageIndex)
 		{
-			fixed (void* p = &relations[relationStorageIndex])
-			{
-				return p;
-			}
+			return &relationDatas[relationStorageIndex];
 		}
 
 		public override void UnrelateAll(int entityID)
@@ -281,6 +291,42 @@ namespace MoonTools.ECS
 				ReturnHashSetToPool(set);
 			}
 			outRelations.Clear();
+		}
+
+		protected virtual void Dispose(bool disposing)
+		{
+			if (!disposed)
+			{
+				Clear();
+
+				if (disposing)
+				{
+					foreach (var set in listPool)
+					{
+						set.Dispose();
+					}
+				}
+
+				NativeMemory.Free(relations);
+				NativeMemory.Free(relationDatas);
+				relations = null;
+				relationDatas = null;
+
+				disposed = true;
+			}
+		}
+
+		~RelationStorage()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: false);
+		}
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
 		}
 	}
 }

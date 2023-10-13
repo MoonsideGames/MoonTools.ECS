@@ -6,11 +6,13 @@ namespace MoonTools.ECS
 {
 	internal class RelationDepot
 	{
+		private EntityStorage EntityStorage;
 		private TypeIndices RelationTypeIndices;
 		private RelationStorage[] storages = new RelationStorage[256];
 
-		public RelationDepot(TypeIndices relationTypeIndices)
+		public RelationDepot(EntityStorage entityStorage, TypeIndices relationTypeIndices)
 		{
+			EntityStorage = entityStorage;
 			RelationTypeIndices = relationTypeIndices;
 		}
 
@@ -123,24 +125,9 @@ namespace MoonTools.ECS
 			storages[relationTypeIndex].Set(entityA, entityB, relationData);
 		}
 
-		public int GetStorageIndex(int relationTypeIndex, int entityA, int entityB)
-		{
-			return storages[relationTypeIndex].GetStorageIndex(entityA, entityB);
-		}
-
-		public unsafe void* Get(int relationTypeIndex, int relationStorageIndex)
-		{
-			return storages[relationTypeIndex].Get(relationStorageIndex);
-		}
-
 		public void UnrelateAll(int entityID, int relationTypeIndex)
 		{
 			storages[relationTypeIndex].UnrelateAll(entityID);
-		}
-
-		public ReverseSpanEnumerator<Entity> OutRelations(int entityID, int relationTypeIndex)
-		{
-			return storages[relationTypeIndex].OutRelations(entityID);
 		}
 
 		public void Clear()
@@ -171,6 +158,34 @@ namespace MoonTools.ECS
 				if (storages[i] == null && other.storages[i] != null)
 				{
 					storages[i] = other.storages[i].CreateStorage();
+				}
+			}
+		}
+
+		public unsafe void TransferStorage(Dictionary<int, int> worldToTransferID, RelationDepot other)
+		{
+			for (var i = 0; i < storages.Length; i += 1)
+			{
+				if (storages[i] != null)
+				{
+					foreach (var (a, b) in storages[i].All())
+					{
+						if (worldToTransferID.TryGetValue(a, out var otherA))
+						{
+							if (worldToTransferID.TryGetValue(b, out var otherB))
+							{
+								var storageIndex = storages[i].GetStorageIndex(a, b);
+								var relationData = storages[i].Get(storageIndex);
+								other.Set(otherA, otherB, i, relationData);
+								other.EntityStorage.AddRelationKind(otherA, i);
+								other.EntityStorage.AddRelationKind(otherB, i);
+							}
+							else
+							{
+								throw new InvalidOperationException($"Missing transfer entity! {EntityStorage.Tag(a.ID)} related to {EntityStorage.Tag(b.ID)}");
+							}
+						}
+					}
 				}
 			}
 		}

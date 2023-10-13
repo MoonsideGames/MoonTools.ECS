@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS
 {
@@ -19,16 +21,24 @@ namespace MoonTools.ECS
 #endif
 	}
 
-	internal class ComponentStorage<TComponent> : ComponentStorage where TComponent : unmanaged
+	internal unsafe class ComponentStorage<TComponent> : ComponentStorage, IDisposable where TComponent : unmanaged
 	{
-		private int nextID;
 		private readonly Dictionary<int, int> entityIDToStorageIndex = new Dictionary<int, int>(16);
-		private int[] entityIDs = new int[16];
-		private TComponent[] components = new TComponent[16];
+		private TComponent* components;
+		private int* entityIDs;
+		private int count = 0;
+		private int capacity = 16;
+		private bool disposed;
+
+		public ComponentStorage()
+		{
+			components = (TComponent*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TComponent>()));
+			entityIDs = (int*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<int>()));
+		}
 
 		public bool Any()
 		{
-			return nextID > 0;
+			return count > 0;
 		}
 
 		public ref readonly TComponent Get(int entityID)
@@ -38,16 +48,13 @@ namespace MoonTools.ECS
 
 		internal override unsafe void* UntypedGet(int entityID)
 		{
-			fixed (void* p = &components[entityIDToStorageIndex[entityID]])
-			{
-				return p;
-			}
+			return &components[entityIDToStorageIndex[entityID]];
 		}
 
 		public ref readonly TComponent GetFirst()
 		{
 #if DEBUG
-			if (nextID == 0)
+			if (count == 0)
 			{
 				throw new IndexOutOfRangeException("Component storage is empty!");
 			}
@@ -59,13 +66,14 @@ namespace MoonTools.ECS
 		{
 			if (!entityIDToStorageIndex.ContainsKey(entityID))
 			{
-				var index = nextID;
-				nextID += 1;
+				var index = count;
+				count += 1;
 
-				if (index >= components.Length)
+				if (index >= capacity)
 				{
-					Array.Resize(ref components, components.Length * 2);
-					Array.Resize(ref entityIDs, entityIDs.Length * 2);
+					capacity *= 2;
+					components = (TComponent*) NativeMemory.Realloc(components, (nuint) (capacity * Unsafe.SizeOf<TComponent>()));
+					entityIDs = (int*) NativeMemory.Realloc(entityIDs, (nuint) (capacity * Unsafe.SizeOf<int>()));
 				}
 
 				entityIDToStorageIndex[entityID] = index;
@@ -77,7 +85,7 @@ namespace MoonTools.ECS
 
 		internal override unsafe void Set(int entityID, void* component)
 		{
-			Set(entityID, *((TComponent*) component));
+			Set(entityID, *(TComponent*) component);
 		}
 
 		// Returns true if the entity had this component.
@@ -87,7 +95,7 @@ namespace MoonTools.ECS
 			{
 				entityIDToStorageIndex.Remove(entityID);
 
-				var lastElementIndex = nextID - 1;
+				var lastElementIndex = count - 1;
 
 				// move a component into the hole to maintain contiguous memory
 				if (lastElementIndex != storageIndex)
@@ -98,7 +106,7 @@ namespace MoonTools.ECS
 					entityIDs[storageIndex] = lastEntityID;
 				}
 
-				nextID -= 1;
+				count -= 1;
 
 				return true;
 			}
@@ -108,19 +116,19 @@ namespace MoonTools.ECS
 
 		public override void Clear()
 		{
-			nextID = 0;
+			count = 0;
 			entityIDToStorageIndex.Clear();
 		}
 
 		public ReadOnlySpan<TComponent> AllComponents()
 		{
-			return new ReadOnlySpan<TComponent>(components, 0, nextID);
+			return new ReadOnlySpan<TComponent>(components, count);
 		}
 
 		public Entity FirstEntity()
 		{
 #if DEBUG
-			if (nextID == 0)
+			if (count == 0)
 			{
 				throw new IndexOutOfRangeException("Component storage is empty!");
 			}
@@ -142,6 +150,32 @@ namespace MoonTools.ECS
 		internal override IEnumerable<int> Debug_GetEntityIDs()
 		{
 			return entityIDToStorageIndex.Keys;
+		}
+
+		protected virtual void Dispose(bool disposing)
+		{
+			if (!disposed)
+			{
+				NativeMemory.Free(components);
+				NativeMemory.Free(entityIDs);
+				components = null;
+				entityIDs = null;
+
+				disposed = true;
+			}
+		}
+
+		~ComponentStorage()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: false);
+		}
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
 		}
 #endif
 	}

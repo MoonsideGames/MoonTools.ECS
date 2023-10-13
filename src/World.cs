@@ -17,7 +17,7 @@ namespace MoonTools.ECS
 		public World()
 		{
 			ComponentDepot = new ComponentDepot(ComponentTypeIndices);
-			RelationDepot = new RelationDepot(RelationTypeIndices);
+			RelationDepot = new RelationDepot(EntityStorage, RelationTypeIndices);
 			FilterStorage = new FilterStorage(EntityStorage, ComponentTypeIndices);
 		}
 
@@ -54,14 +54,11 @@ namespace MoonTools.ECS
 		}
 
 		// untyped version for Transfer
+		// no filter check because filter state is copied directly
 		internal unsafe void Set(Entity entity, int componentTypeIndex, void* component)
 		{
 			ComponentDepot.Set(entity.ID, componentTypeIndex, component);
-
-			if (EntityStorage.SetComponent(entity.ID, componentTypeIndex))
-			{
-				FilterStorage.Check(entity.ID, componentTypeIndex);
-			}
+			EntityStorage.SetComponent(entity.ID, componentTypeIndex);
 		}
 
 		public void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
@@ -78,14 +75,6 @@ namespace MoonTools.ECS
 		{
 			RelationDepot.Set(entityA, entityB, relationData);
 			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
-			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
-			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
-		}
-
-		// untyped version for Transfer
-		internal unsafe void Relate(Entity entityA, Entity entityB, int relationTypeIndex, void* relationData)
-		{
-			RelationDepot.Set(entityA, entityB, relationTypeIndex, relationData);
 			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
 			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
 		}
@@ -156,6 +145,14 @@ namespace MoonTools.ECS
 
 		private Dictionary<int, int> WorldToTransferID = new Dictionary<int, int>();
 
+		/// <summary>
+		/// If you are using the World Transfer feature, call this once after your systems/filters have all been initialized.
+		/// </summary>
+		public void PrepareTransferTo(World other)
+		{
+			other.FilterStorage.CreateMissingStorages(FilterStorage);
+		}
+
 		// FIXME: there's probably a better way to handle Filters so they are not world-bound
 		public unsafe void Transfer(World other, Filter filter, Filter otherFilter)
 		{
@@ -176,30 +173,8 @@ namespace MoonTools.ECS
 				WorldToTransferID.Add(entity.ID, otherWorldEntity.ID);
 			}
 
-			// set relations before components so filters don't freak out
-			foreach (var entity in filter.Entities)
-			{
-				var otherWorldEntityA = WorldToTransferID[entity.ID];
-
-				foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
-				{
-					foreach (var entityB in RelationDepot.OutRelations(entity.ID, relationTypeIndex))
-					{
-						var storageIndex = RelationDepot.GetStorageIndex(relationTypeIndex, entity.ID, entityB);
-
-						int otherWorldEntityB;
-						if (WorldToTransferID.TryGetValue(entityB, out otherWorldEntityB))
-						{
-							other.Relate(otherWorldEntityA, otherWorldEntityB, relationTypeIndex, RelationDepot.Get(relationTypeIndex, storageIndex));
-						}
-						else
-						{
-							// related entity is not in the filter
-							throw new Exception($"Missing transfer entity! {EntityStorage.Tag(entity.ID)} related to {EntityStorage.Tag(entityB.ID)}");
-						}
-					}
-				}
-			}
+			// transfer relations
+			RelationDepot.TransferStorage(WorldToTransferID, other.RelationDepot);
 
 			// set components
 			foreach (var entity in filter.Entities)
@@ -211,6 +186,9 @@ namespace MoonTools.ECS
 					other.Set(otherWorldEntity, componentTypeIndex, ComponentDepot.UntypedGet(entity.ID, componentTypeIndex));
 				}
 			}
+
+			// transfer filters last so callbacks trigger correctly
+			FilterStorage.TransferStorage(WorldToTransferID, other.FilterStorage);
 		}
 	}
 }

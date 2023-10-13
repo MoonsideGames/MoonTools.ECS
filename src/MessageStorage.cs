@@ -1,5 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -8,17 +11,18 @@ namespace MoonTools.ECS
 		public abstract void Clear();
 	}
 
-	internal class MessageStorage<TMessage> : MessageStorage where TMessage : unmanaged
+	internal unsafe class MessageStorage<TMessage> : MessageStorage, IDisposable where TMessage : unmanaged
 	{
 		private int count = 0;
 		private int capacity = 128;
-		private TMessage[] messages;
+		private TMessage* messages;
 		// duplicating storage here for fast iteration
-		private Dictionary<int, DynamicArray<TMessage>> entityToMessages = new Dictionary<int, DynamicArray<TMessage>>();
+		private Dictionary<int, NativeArray<TMessage>> entityToMessages = new Dictionary<int, NativeArray<TMessage>>();
+		private bool disposed;
 
 		public MessageStorage()
 		{
-			messages = new TMessage[capacity];
+			messages = (TMessage*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TMessage>()));
 		}
 
 		public void Add(in TMessage message)
@@ -26,7 +30,7 @@ namespace MoonTools.ECS
 			if (count == capacity)
 			{
 				capacity *= 2;
-				Array.Resize(ref messages, capacity);
+				messages = (TMessage*) NativeMemory.Realloc(messages, (nuint) (capacity * Unsafe.SizeOf<TMessage>()));
 			}
 
 			messages[count] = message;
@@ -37,7 +41,7 @@ namespace MoonTools.ECS
 		{
 			if (!entityToMessages.ContainsKey(entityID))
 			{
-				entityToMessages.Add(entityID, new DynamicArray<TMessage>());
+				entityToMessages.Add(entityID, new NativeArray<TMessage>());
 			}
 			entityToMessages[entityID].Add(message);
 
@@ -51,7 +55,7 @@ namespace MoonTools.ECS
 
 		public ReadOnlySpan<TMessage> All()
 		{
-			return new ReadOnlySpan<TMessage>(messages, 0, count);
+			return new ReadOnlySpan<TMessage>(messages, count);
 		}
 
 		public TMessage First()
@@ -88,6 +92,40 @@ namespace MoonTools.ECS
 			{
 				set.Clear();
 			}
+		}
+
+		protected virtual void Dispose(bool disposing)
+		{
+			if (!disposed)
+			{
+				Clear();
+
+				if (disposing)
+				{
+					foreach (var array in entityToMessages.Values)
+					{
+						array.Dispose();
+					}
+				}
+
+				NativeMemory.Free(messages);
+				messages = null;
+
+				disposed = true;
+			}
+		}
+
+		~MessageStorage()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: false);
+		}
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
 		}
 	}
 }

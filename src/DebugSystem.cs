@@ -13,12 +13,9 @@ namespace MoonTools.ECS
 		{
 		}
 
-		protected IEnumerable<dynamic> Debug_GetAllComponents(Entity entity)
+		protected ComponentEnumerator Debug_GetAllComponents(Entity entity)
 		{
-			foreach (var typeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
-			{
-				yield return ComponentDepot.Debug_Get(entity.ID, typeIndex);
-			}
+			return new ComponentEnumerator(ComponentDepot, entity, EntityStorage.ComponentTypeIndices(entity.ID));
 		}
 
 		protected IEnumerable<Entity> Debug_GetEntities(Type componentType)
@@ -38,6 +35,28 @@ namespace MoonTools.ECS
 					yield return type;
 				}
 			}
+		}
+
+		public ref struct ComponentEnumerator
+		{
+			private ComponentDepot ComponentDepot;
+			private Entity Entity;
+			private ReverseSpanEnumerator<int> ComponentTypeIndices;
+
+			public ComponentEnumerator GetEnumerator() => this;
+
+			internal ComponentEnumerator(
+				ComponentDepot componentDepot,
+				Entity entity,
+				Collections.IndexableSet<int> componentTypeIndices
+			) {
+				ComponentDepot = componentDepot;
+				Entity = entity;
+				ComponentTypeIndices = componentTypeIndices.GetEnumerator();
+			}
+
+			public bool MoveNext() => ComponentTypeIndices.MoveNext();
+			public object Current => ComponentDepot.Debug_Get(Entity.ID, ComponentTypeIndices.Current);
 		}
 	}
 }

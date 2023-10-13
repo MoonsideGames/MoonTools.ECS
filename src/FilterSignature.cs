@@ -1,14 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
 	public struct FilterSignature : IEquatable<FilterSignature>
 	{
-		public readonly HashSet<int> Included;
-		public readonly HashSet<int> Excluded;
+		public readonly IndexableSet<int> Included;
+		public readonly IndexableSet<int> Excluded;
 
-		public FilterSignature(HashSet<int> included, HashSet<int> excluded)
+		public FilterSignature(IndexableSet<int> included, IndexableSet<int> excluded)
 		{
 			Included = included;
 			Excluded = excluded;
@@ -21,8 +22,6 @@ namespace MoonTools.ECS
 
 		public bool Equals(FilterSignature other)
 		{
-			// workaround for HashSet<T>.SetEquals generating garbage
-			// maybe fixed in .NET 8?
 			foreach (var included in Included)
 			{
 				if (!other.Included.Contains(included))

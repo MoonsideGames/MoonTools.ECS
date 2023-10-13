@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -7,18 +6,18 @@ namespace MoonTools.ECS
 	{
 		private TypeIndices ComponentTypeIndices;
 		private FilterStorage FilterStorage;
-		private HashSet<int> Included;
-		private HashSet<int> Excluded;
+		private IndexableSet<int> Included;
+		private IndexableSet<int> Excluded;
 
 		internal FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices)
 		{
 			FilterStorage = filterStorage;
 			ComponentTypeIndices = componentTypeIndices;
-			Included = new HashSet<int>();
-			Excluded = new HashSet<int>();
+			Included = new IndexableSet<int>();
+			Excluded = new IndexableSet<int>();
 		}
 
-		private FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices, HashSet<int> included, HashSet<int> excluded)
+		private FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices, IndexableSet<int> included, IndexableSet<int> excluded)
 		{
 			FilterStorage = filterStorage;
 			ComponentTypeIndices = componentTypeIndices;

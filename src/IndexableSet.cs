@@ -1,26 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS.Collections
 {
-	internal class IndexableSet<T> where T : unmanaged
+	public unsafe class IndexableSet<T> : IDisposable where T : unmanaged
 	{
 		private Dictionary<T, int> indices;
-		private T[] array;
-		public int Count { get; private set; }
-		public ReverseSpanEnumerator<T> GetEnumerator() => new ReverseSpanEnumerator<T>(new Span<T>(array, 0, Count));
+		private T* array;
+		private int count;
+		private int capacity;
+		private bool disposed;
 
-		public IndexableSet(int size = 32)
+		public int Count => count;
+		public ReverseSpanEnumerator<T> GetEnumerator() => new ReverseSpanEnumerator<T>(new Span<T>(array, count));
+
+		public IndexableSet(int capacity = 32)
 		{
-			indices = new Dictionary<T, int>(size);
-			array = new T[size];
+			this.capacity = capacity;
+			count = 0;
+
+			indices = new Dictionary<T, int>(capacity);
+			array = (T*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<T>()));
 		}
 
-		public T this[int i]
-		{
-			get { return array[i]; }
-		}
+		public T this[int i] => array[i];
 
 		public bool Contains(T element)
 		{
@@ -31,15 +36,16 @@ namespace MoonTools.ECS
 		{
 			if (!Contains(element))
 			{
-				indices.Add(element, Count);
+				indices.Add(element, count);
 
-				if (Count >= array.Length)
+				if (count >= capacity)
 				{
-					Array.Resize(ref array, array.Length * 2);
+					capacity *= 2;
+					array = (T*) NativeMemory.Realloc(array, (nuint) (capacity * Unsafe.SizeOf<T>()));
 				}
 
-				array[Count] = element;
-				Count += 1;
+				array[count] = element;
+				count += 1;
 
 				return true;
 			}
@@ -58,7 +64,7 @@ namespace MoonTools.ECS
 			var index = indices[element];
 			array[index] = lastElement;
 			indices[lastElement] = index;
-			Count -= 1;
+			count -= 1;
 			indices.Remove(element);
 
 			return true;
@@ -66,45 +72,32 @@ namespace MoonTools.ECS
 
 		public void Clear()
 		{
-			Count = 0;
+			indices.Clear();
+			count = 0;
 		}
 
-		public struct Enumerator
+		protected virtual void Dispose(bool disposing)
 		{
-			/// <summary>The set being enumerated.</summary>
-			private readonly IndexableSet<T> _set;
-			/// <summary>The next index to yield.</summary>
-			private int _index;
-
-			/// <summary>Initialize the enumerator.</summary>
-			/// <param name="set">The set to enumerate.</param>
-			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			internal Enumerator(IndexableSet<T> set)
+			if (!disposed)
 			{
-				_set = set;
-				_index = _set.Count;
-			}
+				NativeMemory.Free(array);
+				array = null;
 
-			/// <summary>Advances the enumerator to the next element of the span.</summary>
-			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			public bool MoveNext()
-			{
-				int index = _index - 1;
-				if (index >= 0)
-				{
-					_index = index;
-					return true;
-				}
-
-				return false;
+				disposed = true;
 			}
+		}
 
-			/// <summary>Gets the element at the current position of the enumerator.</summary>
-			public T Current
-			{
-				[MethodImpl(MethodImplOptions.AggressiveInlining)]
-				get => _set[_index];
-			}
+		~IndexableSet()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: false);
+		}
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
 		}
 	}
 }

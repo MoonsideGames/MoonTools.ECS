@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -8,7 +9,7 @@ namespace MoonTools.ECS
 		private EntityStorage EntityStorage;
 		private TypeIndices ComponentTypeIndices;
 		private Dictionary<FilterSignature, IndexableSet<Entity>> filterSignatureToEntityIDs = new Dictionary<FilterSignature, IndexableSet<Entity>>();
-		private Dictionary<int, HashSet<FilterSignature>> typeToFilterSignatures = new Dictionary<int, HashSet<FilterSignature>>();
+		private Dictionary<int, List<FilterSignature>> typeToFilterSignatures = new Dictionary<int, List<FilterSignature>>();
 
 		private Dictionary<FilterSignature, Action<Entity>> addCallbacks = new Dictionary<FilterSignature, Action<Entity>>();
 		private Dictionary<FilterSignature, Action<Entity>> removeCallbacks = new Dictionary<FilterSignature, Action<Entity>>();
@@ -19,7 +20,36 @@ namespace MoonTools.ECS
 			ComponentTypeIndices = componentTypeIndices;
 		}
 
-		public Filter CreateFilter(HashSet<int> included, HashSet<int> excluded)
+		private void CopyTypeCache(Dictionary<int, List<FilterSignature>> typeCache)
+		{
+			foreach (var type in typeCache.Keys)
+			{
+				if (!typeToFilterSignatures.ContainsKey(type))
+				{
+					typeToFilterSignatures.Add(type, new List<FilterSignature>());
+
+					foreach (var signature in typeCache[type])
+					{
+						typeToFilterSignatures[type].Add(signature);
+					}
+				}
+			}
+		}
+
+		public void CreateMissingStorages(FilterStorage other)
+		{
+			foreach (var filterSignature in other.filterSignatureToEntityIDs.Keys)
+			{
+				if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
+				{
+					filterSignatureToEntityIDs.Add(filterSignature, new IndexableSet<Entity>());
+				}
+			}
+
+			CopyTypeCache(other.typeToFilterSignatures);
+		}
+
+		public Filter CreateFilter(IndexableSet<int> included, IndexableSet<int> excluded)
 		{
 			var filterSignature = new FilterSignature(included, excluded);
 			if (!filterSignatureToEntityIDs.ContainsKey(filterSignature))
@@ -30,7 +60,7 @@ namespace MoonTools.ECS
 				{
 					if (!typeToFilterSignatures.ContainsKey(type))
 					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+						typeToFilterSignatures.Add(type, new List<FilterSignature>());
 					}
 
 					typeToFilterSignatures[type].Add(filterSignature);
@@ -40,7 +70,7 @@ namespace MoonTools.ECS
 				{
 					if (!typeToFilterSignatures.ContainsKey(type))
 					{
-						typeToFilterSignatures.Add(type, new HashSet<FilterSignature>());
+						typeToFilterSignatures.Add(type, new List<FilterSignature>());
 					}
 
 					typeToFilterSignatures[type].Add(filterSignature);
@@ -59,7 +89,7 @@ namespace MoonTools.ECS
 			return new RandomEntityEnumerator(
 				this,
 				filterSignature,
-				RandomGenerator.LinearCongruentialGenerator(FilterCount(filterSignature)));
+				RandomManager.LinearCongruentialSequence(FilterCount(filterSignature)));
 		}
 
 		public Entity FilterNthEntity(FilterSignature filterSignature, int index)
@@ -69,7 +99,7 @@ namespace MoonTools.ECS
 
 		public Entity FilterRandomEntity(FilterSignature filterSignature)
 		{
-			var randomIndex = RandomGenerator.Next(FilterCount(filterSignature));
+			var randomIndex = RandomManager.Next(FilterCount(filterSignature));
 			return new Entity(filterSignatureToEntityIDs[filterSignature][randomIndex]);
 		}
 
@@ -147,10 +177,12 @@ namespace MoonTools.ECS
 				}
 			}
 
-			filterSignatureToEntityIDs[filterSignature].Add(entityID);
-			if (addCallbacks.TryGetValue(filterSignature, out var addCallback))
+			if (filterSignatureToEntityIDs[filterSignature].Add(entityID))
 			{
-				addCallback(entityID);
+				if (addCallbacks.TryGetValue(filterSignature, out var addCallback))
+				{
+					addCallback(entityID);
+				}
 			}
 		}
 
@@ -165,6 +197,32 @@ namespace MoonTools.ECS
 						if (removeCallbacks.TryGetValue(filterSignature, out var removeCallback))
 						{
 							removeCallback(entityID);
+						}
+					}
+				}
+			}
+		}
+
+		// Used by TransferEntity
+		public void AddEntity(FilterSignature signature, int entityID)
+		{
+			filterSignatureToEntityIDs[signature].Add(entityID);
+		}
+
+		public void TransferStorage(Dictionary<int, int> worldToTransferID, FilterStorage other)
+		{
+			foreach (var (filterSignature, entityIDs) in filterSignatureToEntityIDs)
+			{
+				foreach (var entity in entityIDs)
+				{
+					if (worldToTransferID.ContainsKey(entity))
+					{
+						var otherEntityID = worldToTransferID[entity];
+						other.AddEntity(filterSignature, otherEntityID);
+
+						if (other.addCallbacks.TryGetValue(filterSignature, out var addCallback))
+						{
+							addCallback(otherEntityID);
 						}
 					}
 				}

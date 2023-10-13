@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS
 {
@@ -10,8 +11,8 @@ namespace MoonTools.ECS
 		// FIXME: this is only needed in debug mode
 		private readonly HashSet<int> availableIDHash = new HashSet<int>();
 
-		private Dictionary<int, HashSet<int>> EntityToComponentTypeIndices = new Dictionary<int, HashSet<int>>();
-		private Dictionary<int, HashSet<int>> EntityToRelationTypeIndices = new Dictionary<int, HashSet<int>>();
+		private Dictionary<int, IndexableSet<int>> EntityToComponentTypeIndices = new Dictionary<int, IndexableSet<int>>();
+		private Dictionary<int, IndexableSet<int>> EntityToRelationTypeIndices = new Dictionary<int, IndexableSet<int>>();
 
 		public int Count => nextID - availableIDs.Count;
 
@@ -23,12 +24,12 @@ namespace MoonTools.ECS
 
 			if (!EntityToComponentTypeIndices.ContainsKey(entity.ID))
 			{
-				EntityToComponentTypeIndices.Add(entity.ID, new HashSet<int>());
+				EntityToComponentTypeIndices.Add(entity.ID, new IndexableSet<int>());
 			}
 
 			if (!EntityToRelationTypeIndices.ContainsKey(entity.ID))
 			{
-				EntityToRelationTypeIndices.Add(entity.ID, new HashSet<int>());
+				EntityToRelationTypeIndices.Add(entity.ID, new IndexableSet<int>());
 			}
 
 			Tags[entity.ID] = tag;
@@ -86,12 +87,12 @@ namespace MoonTools.ECS
 			return Tags[entityID];
 		}
 
-		public HashSet<int> ComponentTypeIndices(int entityID)
+		public IndexableSet<int> ComponentTypeIndices(int entityID)
 		{
 			return EntityToComponentTypeIndices[entityID];
 		}
 
-		public HashSet<int> RelationTypeIndices(int entityID)
+		public IndexableSet<int> RelationTypeIndices(int entityID)
 		{
 			return EntityToRelationTypeIndices[entityID];
 		}

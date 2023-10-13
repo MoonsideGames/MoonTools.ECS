@@ -89,7 +89,7 @@ namespace MoonTools.ECS
 			}
 		}
 
-		// these methods used to implement snapshots, templates, and debugging
+		// these methods used to implement transfers and debugging
 
 		internal unsafe void* UntypedGet(int entityID, int componentTypeIndex)
 		{

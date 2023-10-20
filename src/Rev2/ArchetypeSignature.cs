@@ -34,6 +34,16 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
+		public void Remove(ComponentId componentId)
+		{
+			var index = Ids.BinarySearch(componentId.Id);
+
+			if (index >= 0)
+			{
+				Ids.RemoveAt(index);
+			}
+		}
+
 		public void CopyTo(ArchetypeSignature other)
 		{
 			other.Ids.AddRange(Ids);

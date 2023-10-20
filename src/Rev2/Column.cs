@@ -1,21 +1,18 @@
-using System.Runtime.CompilerServices;
+using System;
 using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS.Rev2
 {
-	public unsafe class Column
+	public unsafe class Column : IDisposable
 	{
 		public nint Elements;
 		public int ElementSize;
 		public int Count;
 		public int Capacity;
 
-		public static Column Create<T>() where T : unmanaged
-		{
-			return new Column(Unsafe.SizeOf<T>());
-		}
+		private bool IsDisposed;
 
-		private Column(int elementSize)
+		public Column(int elementSize)
 		{
 			Capacity = 16;
 			Count = 0;
@@ -44,6 +41,17 @@ namespace MoonTools.ECS.Rev2
 			Count -= 1;
 		}
 
+		public void Append<T>(T component) where T : unmanaged
+		{
+			if (Count >= Capacity)
+			{
+				Resize();
+			}
+
+			((T*) Elements)[Count] = component;
+			Count += 1;
+		}
+
 		public void CopyToEnd(int index, Column other)
 		{
 			if (other.Count >= other.Capacity)
@@ -58,6 +66,28 @@ namespace MoonTools.ECS.Rev2
 			);
 
 			other.Count += 1;
+		}
+
+		protected virtual void Dispose(bool disposing)
+		{
+			if (!IsDisposed)
+			{
+				NativeMemory.Free((void*) Elements);
+				IsDisposed = true;
+			}
+		}
+
+		~Column()
+		{
+		    // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		    Dispose(disposing: false);
+		}
+
+		public void Dispose()
+		{
+			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+			Dispose(disposing: true);
+			GC.SuppressFinalize(this);
 		}
 	}
 }

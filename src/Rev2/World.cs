@@ -28,6 +28,8 @@ namespace MoonTools.ECS.Rev2
 
 		private bool IsDisposed;
 
+		public delegate void RefAction<T1, T2>(ref T1 arg1, ref T2 arg2);
+
 		public World()
 		{
 			// Create the Empty Archetype
@@ -64,23 +66,31 @@ namespace MoonTools.ECS.Rev2
 		}
 
 		// FIXME: would be much more efficient to do all this at load time somehow
-		private ComponentId RegisterComponent<T>() where T : unmanaged
+		private void RegisterComponent<T>() where T : unmanaged
 		{
 			var componentId = ComponentIdAssigner.Assign();
 			TypeToComponentId.Add(typeof(T), componentId);
 			ComponentIndex.Add(componentId, new Dictionary<ArchetypeId, ArchetypeRecord>());
 			ElementSizes.Add(componentId, Unsafe.SizeOf<T>());
-			return componentId;
 		}
 
-		public ComponentId GetComponentId<T>() where T : unmanaged
+		private void TryRegisterComponentId<T>() where T : unmanaged
 		{
 			if (!TypeToComponentId.TryGetValue(typeof(T), out var componentId))
 			{
-				return RegisterComponent<T>();
+				RegisterComponent<T>();
 			}
+		}
 
-			return componentId;
+		private ComponentId GetComponentId<T>() where T : unmanaged
+		{
+			return TypeToComponentId[typeof(T)];
+		}
+
+		internal ArchetypeRecord GetArchetypeRecord<T>(Archetype archetype) where T : unmanaged
+		{
+			var componentId = GetComponentId<T>();
+			return ComponentIndex[componentId][archetype.Id];
 		}
 
 		public bool HasComponent<T>(EntityId entityId) where T : unmanaged
@@ -111,7 +121,28 @@ namespace MoonTools.ECS.Rev2
 			return ((T*) column.Elements)[record.Row];
 		}
 
-		public void AddComponent<T>(EntityId entityId, T component) where T : unmanaged
+		public unsafe void SetComponent<T>(EntityId entityId, T component) where T : unmanaged
+		{
+			TryRegisterComponentId<T>();
+			var componentId = GetComponentId<T>();
+
+			if (HasComponent<T>(entityId))
+			{
+				var record = EntityIndex[entityId];
+				var archetype = record.Archetype;
+				var archetypes = ComponentIndex[componentId];
+				var archetypeRecord = archetypes[archetype.Id];
+				var column = archetype.Components[archetypeRecord.ColumnIndex];
+
+				((T*) column.Elements)[record.Row] = component;
+			}
+			else
+			{
+				AddComponent(entityId, component);
+			}
+		}
+
+		private void AddComponent<T>(EntityId entityId, T component) where T : unmanaged
 		{
 			Archetype? nextArchetype;
 
@@ -246,6 +277,54 @@ namespace MoonTools.ECS.Rev2
 			to.Count += 1;
 			from.Count -= 1;
 		}
+
+		public unsafe void ForEachEntity<T1, T2>(ArchetypeSignature signature, RefAction<T1, T2> rowAction) where T1 : unmanaged where T2 : unmanaged
+		{
+			var archetype = ArchetypeIndex[signature];
+
+			var componentIdOne = signature[0];
+			var columnIndexOne = ComponentIndex[componentIdOne][archetype.Id].ColumnIndex;
+			var columnOneElements = archetype.Components[columnIndexOne].Elements;
+
+			var componentIdTwo = signature[1];
+			var columnIndexTwo = ComponentIndex[componentIdTwo][archetype.Id].ColumnIndex;
+			var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
+
+			for (int i = 0; i < archetype.Count; i += 1)
+			{
+				rowAction(ref ((T1*) columnOneElements)[i], ref ((T2*) columnTwoElements)[i]);
+			}
+
+			foreach (var edge in archetype.Edges.Values)
+			{
+				if (edge.Add != archetype)
+				{
+					ForEachEntity(edge.Add.Signature, rowAction);
+				}
+			}
+		}
+
+		/*
+		public void ForEachEntity(ArchetypeSignature signature, Action<Entity> rowAction)
+		{
+			var archetype = ArchetypeIndex[signature];
+
+			for (int i = 0; i < archetype.Count; i += 1)
+			{
+				var entity = new Entity(this, archetype, i, archetype.RowToEntity[i]);
+				rowAction(entity);
+			}
+
+			// recursion might get too hairy here
+			foreach (var edge in archetype.Edges.Values)
+			{
+				if (edge.Add != archetype)
+				{
+					ForEachEntity(edge.Add.Signature, rowAction);
+				}
+			}
+		}
+		*/
 
 		protected virtual void Dispose(bool disposing)
 		{

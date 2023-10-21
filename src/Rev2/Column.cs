@@ -27,6 +27,7 @@ namespace MoonTools.ECS.Rev2
 			Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
 		}
 
+		// Fills gap by copying final element to the deleted index
 		public void Delete(int index)
 		{
 			if (Count > 1)

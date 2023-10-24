@@ -1,36 +1,161 @@
 using System;
-using System.Runtime.InteropServices;
+using System.Collections.Generic;
 
 namespace MoonTools.ECS.Rev2
 {
 	// TODO: do we want to get fancy with queries beyond Include and Exclude?
-	// TODO: need an edge iterator as part of this nested horseshit
 	public class Filter
 	{
-		private Archetype Start;
+		private Archetype EmptyArchetype;
+		private HashSet<ComponentId> Included;
+		private HashSet<ComponentId> Excluded;
 
-		public EntityEnumerator Entities => new EntityEnumerator(Start);
+		public EntityEnumerator Entities => new EntityEnumerator(this);
+		internal ArchetypeEnumerator Archetypes => new ArchetypeEnumerator(this);
+		public RandomEntityEnumerator EntitiesInRandomOrder => new RandomEntityEnumerator(this);
 
-		private ref struct FilterEnumerator
+		public bool Empty
+		{
+			get
+			{
+				var empty = true;
+
+				foreach (var archetype in Archetypes)
+				{
+					if (archetype.Count > 0)
+					{
+						return false;
+					}
+				}
+
+				return empty;
+			}
+		}
+
+		public int Count
+		{
+			get
+			{
+				var count = 0;
+
+				foreach (var archetype in Archetypes)
+				{
+					count += archetype.Count;
+				}
+
+				return count;
+			}
+		}
+
+		// WARNING: this WILL crash if the index is out of range!
+		public EntityId NthEntity(int index)
+		{
+			var count = 0;
+
+			foreach (var archetype in Archetypes)
+			{
+				count += archetype.Count;
+				if (index < count)
+				{
+					return archetype.RowToEntity[index];
+				}
+
+				index -= count;
+			}
+
+			throw new InvalidOperationException("Filter index out of range!");
+		}
+
+		public EntityId RandomEntity
+		{
+			get
+			{
+				var randomIndex = RandomManager.Next(Count);
+				return NthEntity(randomIndex);
+			}
+		}
+
+		public Filter(Archetype emptyArchetype, HashSet<ComponentId> included, HashSet<ComponentId> excluded)
+		{
+			EmptyArchetype = emptyArchetype;
+			Included = included;
+			Excluded = excluded;
+		}
+
+		internal ref struct ArchetypeEnumerator
 		{
 			private Archetype CurrentArchetype;
 			private bool Active;
 
-			public FilterEnumerator(Archetype start)
+			// TODO: pool these
+			private Queue<Archetype> ArchetypeQueue = new Queue<Archetype>();
+			private Queue<Archetype> ArchetypeSearchQueue = new Queue<Archetype>();
+			private HashSet<Archetype> Explored = new HashSet<Archetype>();
+
+			public ArchetypeEnumerator GetEnumerator() => this;
+
+			public ArchetypeEnumerator(Filter filter)
 			{
-				CurrentArchetype = start;
 				Active = false;
+
+				var empty = filter.EmptyArchetype;
+				ArchetypeSearchQueue.Enqueue(empty);
+
+				while (ArchetypeSearchQueue.TryDequeue(out var current))
+				{
+					// exclude the empty archetype
+					var satisfiesFilter = filter.Included.Count != 0;
+
+					foreach (var componentId in filter.Included)
+					{
+						if (!current.ComponentToColumnIndex.ContainsKey(componentId))
+						{
+							satisfiesFilter = false;
+						}
+					}
+
+					foreach (var componentId in filter.Excluded)
+					{
+						if (current.ComponentToColumnIndex.ContainsKey(componentId))
+						{
+							satisfiesFilter = false;
+						}
+					}
+
+					if (satisfiesFilter)
+					{
+						ArchetypeQueue.Enqueue(current);
+					}
+
+					// if the current archetype satisfies the filter, we need to add all edges that
+					// do not have an excluded component
+					// if the current archetype does not satisfy the filter, we need to add all edges that
+					// include an included component
+					foreach (var (componentId, edge) in current.Edges)
+					{
+						if (satisfiesFilter)
+						{
+							if (!filter.Excluded.Contains(componentId) && !Explored.Contains(edge.Add))
+							{
+								Explored.Add(edge.Add);
+								ArchetypeSearchQueue.Enqueue(edge.Add);
+							}
+						}
+						else
+						{
+							if (filter.Included.Contains(componentId) && !Explored.Contains(edge.Add))
+							{
+								Explored.Add(edge.Add);
+								ArchetypeSearchQueue.Enqueue(edge.Add);
+							}
+						}
+					}
+				}
 			}
 
 			public bool MoveNext()
 			{
-				if (!Active)
-				{
-					Active = true;
-					return true;
-				}
-
-				// TODO: go to next available edge
+				return ArchetypeQueue.TryDequeue(out CurrentArchetype!);
 			}
 
 			public Archetype Current => CurrentArchetype;
@@ -38,39 +163,50 @@ namespace MoonTools.ECS.Rev2
 
 		public ref struct EntityEnumerator
 		{
-			private FilterEnumerator FilterEnumerator;
-			private ReverseSpanEnumerator<EntityId> EntityListEnumerator;
-			private bool EntityListEnumeratorActive;
+			private EntityId CurrentEntity;
 
 			public EntityEnumerator GetEnumerator() => this;
 
-			public EntityEnumerator(Archetype start)
+			// TODO: pool this
+			Queue<EntityId> EntityQueue = new Queue<EntityId>();
+
+			internal EntityEnumerator(Filter filter)
 			{
-				FilterEnumerator = new FilterEnumerator(start);
+				var archetypeEnumerator = new ArchetypeEnumerator(filter);
+
+				foreach (var archetype in archetypeEnumerator)
+				{
+					foreach (var entity in archetype.RowToEntity)
+					{
+						EntityQueue.Enqueue(entity);
+					}
+				}
 			}
 
 			public bool MoveNext()
 			{
-				if (!EntityListEnumeratorActive || !EntityListEnumerator.MoveNext())
-				{
-					if (!FilterEnumerator.MoveNext())
-					{
-						return false;
-					}
-
-					if (FilterEnumerator.Current.RowToEntity.Count != 0)
-					{
-						EntityListEnumerator = new ReverseSpanEnumerator<EntityId>(CollectionsMarshal.AsSpan(FilterEnumerator.Current.RowToEntity));
-						EntityListEnumeratorActive = true;
-					}
-
-					return MoveNext();
-				}
-
-				return true;
+				return EntityQueue.TryDequeue(out CurrentEntity);
 			}
 
-			public EntityId Current => EntityListEnumerator.Current;
+			public EntityId Current => CurrentEntity;
+		}
+
+		public ref struct RandomEntityEnumerator
+		{
+			private Filter Filter;
+			private LinearCongruentialEnumerator LinearCongruentialEnumerator;
+
+			public RandomEntityEnumerator GetEnumerator() => this;
+
+			internal RandomEntityEnumerator(Filter filter)
+			{
+				Filter = filter;
+				LinearCongruentialEnumerator =
+					RandomManager.LinearCongruentialSequence(filter.Count);
+			}
+
+			public bool MoveNext() => LinearCongruentialEnumerator.MoveNext();
+			public EntityId Current => Filter.NthEntity(LinearCongruentialEnumerator.Current);
 		}
 	}
 }

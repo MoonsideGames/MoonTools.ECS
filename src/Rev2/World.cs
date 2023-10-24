@@ -27,6 +27,8 @@ namespace MoonTools.ECS.Rev2
 		IdAssigner<EntityId> EntityIdAssigner = new IdAssigner<EntityId>();
 		IdAssigner<ComponentId> ComponentIdAssigner = new IdAssigner<ComponentId>();
 
+		public readonly Archetype EmptyArchetype;
+
 		private bool IsDisposed;
 
 		public delegate void RefAction<T1, T2>(ref T1 arg1, ref T2 arg2);
@@ -34,7 +36,7 @@ namespace MoonTools.ECS.Rev2
 		public World()
 		{
 			// Create the Empty Archetype
-			CreateArchetype(ArchetypeSignature.Empty);
+			EmptyArchetype = CreateArchetype(ArchetypeSignature.Empty);
 		}
 
 		private Archetype CreateArchetype(ArchetypeSignature signature)
@@ -62,7 +64,7 @@ namespace MoonTools.ECS.Rev2
 		{
 			var entityId = EntityIdAssigner.Assign();
 			var emptyArchetype = ArchetypeIndex[ArchetypeSignature.Empty];
-			EntityIndex.Add(entityId, new Record(emptyArchetype, 0));
+			EntityIndex.Add(entityId, new Record(emptyArchetype, emptyArchetype.Count));
 			emptyArchetype.RowToEntity.Add(entityId);
 			return entityId;
 		}
@@ -210,14 +212,15 @@ namespace MoonTools.ECS.Rev2
 				archetype.Components[i].Delete(row);
 			}
 
-			if (archetype.Count > 1)
+			if (row != archetype.Count - 1)
 			{
-				// update row to entity lookup on archetype
-				archetype.RowToEntity[row] = archetype.RowToEntity[archetype.Count - 1];
-				archetype.RowToEntity.RemoveAt(archetype.Count - 1);
+				// move last row entity to open spot
+				var lastRowEntity = archetype.RowToEntity[archetype.Count - 1];
+				archetype.RowToEntity[row] = lastRowEntity;
+				EntityIndex[lastRowEntity] = new Record(archetype, row);
 			}
 
-			archetype.Count -= 1;
+			archetype.RowToEntity.RemoveAt(archetype.Count - 1);
 			EntityIndex.Remove(entityId);
 			EntityIdAssigner.Unassign(entityId);
 		}
@@ -236,20 +239,19 @@ namespace MoonTools.ECS.Rev2
 				from.Components[i].Delete(row);
 			}
 
-			if (from.Count > 1)
+			if (row != from.Count - 1)
 			{
-				// update row to entity lookup on from archetype
-				from.RowToEntity[row] = from.RowToEntity[from.Count - 1];
-				from.RowToEntity.RemoveAt(from.Count - 1);
-				EntityIndex[from.RowToEntity[row]] = new Record(from, row);
+				// move last row entity to open spot
+				var lastRowEntity = from.RowToEntity[from.Count - 1];
+				from.RowToEntity[row] = lastRowEntity;
+				EntityIndex[lastRowEntity] = new Record(from, row);
 			}
+
+			from.RowToEntity.RemoveAt(from.Count - 1);
 
 			// update row to entity lookup on to archetype
 			EntityIndex[entityId] = new Record(to, to.Count);
 			to.RowToEntity.Add(entityId);
-
-			to.Count += 1;
-			from.Count -= 1;
 		}
 
 		private void MoveEntityToLowerArchetype(EntityId entityId, int row, Archetype from, Archetype to, ComponentId removed)
@@ -269,99 +271,58 @@ namespace MoonTools.ECS.Rev2
 				}
 			}
 
-			if (from.Count > 1)
+			if (row != from.Count - 1)
 			{
 				// update row to entity lookup on from archetype
-				from.RowToEntity[row] = from.RowToEntity[from.Count - 1];
-				from.RowToEntity.RemoveAt(from.Count - 1);
-				EntityIndex[from.RowToEntity[row]] = new Record(from, row);
+				var lastRowEntity = from.RowToEntity[from.Count - 1];
+				from.RowToEntity[row] = lastRowEntity;
+				EntityIndex[lastRowEntity] = new Record(from, row);
 			}
+
+			from.RowToEntity.RemoveAt(from.Count - 1);
 
 			// update row to entity lookup on to archetype
 			EntityIndex[entityId] = new Record(to, to.Count);
 			to.RowToEntity.Add(entityId);
-
-			to.Count += 1;
-			from.Count -= 1;
 		}
 
-		public unsafe void ForEachEntity<T, T1, T2>(ArchetypeSignature signature,
+		public unsafe void ForEachEntity<T, T1, T2>(Filter filter,
 			T rowForEachContainer) where T : IForEach<T1, T2> where T1 : unmanaged where T2 : unmanaged
 		{
-			var archetype = ArchetypeIndex[signature];
-
-			var componentIdOne = signature[0];
-			var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
-			var columnOneElements = archetype.Components[columnIndexOne].Elements;
-
-			var componentIdTwo = signature[1];
-			var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
-			var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
-
-			for (int i = archetype.Count - 1; i >= 0; i -= 1)
+			foreach (var archetype in filter.Archetypes)
 			{
-				rowForEachContainer.Update(ref ((T1*) columnOneElements)[i], ref ((T2*) columnTwoElements)[i]);
-			}
+				var componentIdOne = archetype.Signature[0];
+				var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
+				var columnOneElements = archetype.Components[columnIndexOne].Elements;
 
-			foreach (var edge in archetype.Edges.Values)
-			{
-				if (edge.Add != archetype)
+				var componentIdTwo = archetype.Signature[1];
+				var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
+				var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
+
+				for (int i = archetype.Count - 1; i >= 0; i -= 1)
 				{
-					ForEachEntity<T, T1, T2>(edge.Add.Signature, rowForEachContainer);
+					rowForEachContainer.Update(ref ((T1*) columnOneElements)[i], ref ((T2*) columnTwoElements)[i]);
 				}
 			}
 		}
 
-		public unsafe void ForEachEntity<T1, T2>(ArchetypeSignature signature, RefAction<T1, T2> rowAction) where T1 : unmanaged where T2 : unmanaged
+		public unsafe void ForEachEntity<T1, T2>(Filter filter, RefAction<T1, T2> rowAction) where T1 : unmanaged where T2 : unmanaged
 		{
-			var archetype = ArchetypeIndex[signature];
-
-			var componentIdOne = signature[0];
-			var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
-			var columnOneElements = archetype.Components[columnIndexOne].Elements;
-
-			var componentIdTwo = signature[1];
-			var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
-			var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
-
-			for (int i = archetype.Count - 1; i >= 0; i -= 1)
+			foreach (var archetype in filter.Archetypes)
 			{
-				rowAction(ref ((T1*) columnOneElements)[i], ref ((T2*) columnTwoElements)[i]);
-			}
+				var componentIdOne = archetype.Signature[0];
+				var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
+				var columnOneElements = archetype.Components[columnIndexOne].Elements;
 
-			foreach (var edge in archetype.Edges.Values)
-			{
-				if (edge.Add != archetype)
+				var componentIdTwo = archetype.Signature[1];
+				var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
+				var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
+
+				for (int i = archetype.Count - 1; i >= 0; i -= 1)
 				{
-					ForEachEntity(edge.Add.Signature, rowAction);
+					rowAction(ref ((T1*) columnOneElements)[i], ref ((T2*) columnTwoElements)[i]);
 				}
 			}
-		}
-
-		public void ForEachEntity(ArchetypeSignature signature, Action<EntityId> rowAction)
-		{
-			var archetype = ArchetypeIndex[signature];
-
-			for (int i = 0; i < archetype.Count; i += 1)
-			{
-				rowAction(archetype.RowToEntity[i]);
-			}
-
-			// recursion might get too hairy here
-			foreach (var edge in archetype.Edges.Values)
-			{
-				if (edge.Add != archetype)
-				{
-					ForEachEntity(edge.Add.Signature, rowAction);
-				}
-			}
-		}
-
-		public ReverseSpanEnumerator<EntityId> Entities(ArchetypeSignature signature)
-		{
-			var archetype = ArchetypeIndex[signature];
-			return new ReverseSpanEnumerator<EntityId>(
-				CollectionsMarshal.AsSpan(archetype.RowToEntity));
 		}
 
 		protected virtual void Dispose(bool disposing)

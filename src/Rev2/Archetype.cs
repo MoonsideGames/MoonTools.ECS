@@ -13,13 +13,12 @@ namespace MoonTools.ECS.Rev2
 			new Dictionary<ComponentId, int>();
 		public SortedDictionary<ComponentId, ArchetypeEdge> Edges = new SortedDictionary<ComponentId, ArchetypeEdge>();
 
-		public int Count;
+		public int Count => RowToEntity.Count;
 
 		public Archetype(ArchetypeId id, ArchetypeSignature signature)
 		{
 			Id = id;
 			Signature = signature;
-			Count = 0;
 		}
 	}
 }

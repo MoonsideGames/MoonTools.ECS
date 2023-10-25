@@ -47,6 +47,15 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
+		public EntityId RandomEntity
+		{
+			get
+			{
+				var randomIndex = RandomManager.Next(Count);
+				return NthEntity(randomIndex);
+			}
+		}
+
 		// WARNING: this WILL crash if the index is out of range!
 		public EntityId NthEntity(int index)
 		{
@@ -66,16 +75,25 @@ namespace MoonTools.ECS.Rev2
 			throw new InvalidOperationException("Filter index out of range!");
 		}
 
-		public EntityId RandomEntity
+		public void DestroyAllEntities()
 		{
-			get
+			foreach (var archetype in Archetypes)
 			{
-				var randomIndex = RandomManager.Next(Count);
-				return NthEntity(randomIndex);
+				archetype.ClearAll();
 			}
 		}
 
-		public Filter(Archetype emptyArchetype, HashSet<ComponentId> included, HashSet<ComponentId> excluded)
+		public void TakeSnapshot(Snapshot snapshot)
+		{
+			snapshot.Reset();
+
+			foreach (var archetype in Archetypes)
+			{
+				snapshot.TakeArchetypeSnapshot(archetype);
+			}
+		}
+
+		internal Filter(Archetype emptyArchetype, HashSet<ComponentId> included, HashSet<ComponentId> excluded)
 		{
 			EmptyArchetype = emptyArchetype;
 			Included = included;
@@ -85,7 +103,6 @@ namespace MoonTools.ECS.Rev2
 		internal ref struct ArchetypeEnumerator
 		{
 			private Archetype CurrentArchetype;
-			private bool Active;
 
 			// TODO: pool these
 			private Queue<Archetype> ArchetypeQueue = new Queue<Archetype>();
@@ -96,8 +113,6 @@ namespace MoonTools.ECS.Rev2
 
 			public ArchetypeEnumerator(Filter filter)
 			{
-				Active = false;
-
 				var empty = filter.EmptyArchetype;
 				ArchetypeSearchQueue.Enqueue(empty);
 
@@ -127,27 +142,14 @@ namespace MoonTools.ECS.Rev2
 						ArchetypeQueue.Enqueue(current);
 					}
 
-					// if the current archetype satisfies the filter, we need to add all edges that
-					// do not have an excluded component
-					// if the current archetype does not satisfy the filter, we need to add all edges that
-					// include an included component
+					// breadth-first search
+					// ignore excluded component edges
 					foreach (var (componentId, edge) in current.Edges)
 					{
-						if (satisfiesFilter)
+						if (!Explored.Contains(edge.Add) && !filter.Excluded.Contains(componentId))
 						{
-							if (!filter.Excluded.Contains(componentId) && !Explored.Contains(edge.Add))
-							{
-								Explored.Add(edge.Add);
-								ArchetypeSearchQueue.Enqueue(edge.Add);
-							}
-						}
-						else
-						{
-							if (filter.Included.Contains(componentId) && !Explored.Contains(edge.Add))
-							{
-								Explored.Add(edge.Add);
-								ArchetypeSearchQueue.Enqueue(edge.Add);
-							}
+							Explored.Add(edge.Add);
+							ArchetypeSearchQueue.Enqueue(edge.Add);
 						}
 					}
 				}

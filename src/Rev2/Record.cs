@@ -1,4 +1,4 @@
 namespace MoonTools.ECS.Rev2
 {
-	public readonly record struct Record(Archetype Archetype, int Row);
+	internal readonly record struct Record(Archetype Archetype, int Row);
 }

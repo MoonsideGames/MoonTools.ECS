@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS.Rev2
 {
-	public class IdAssigner<T> where T : struct, IHasId
+	internal class IdAssigner<T> where T : struct, IHasId
 	{
 		int Next;
 		Queue<int> AvailableIds = new Queue<int>();

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS.Rev2
 {
-	public class ArchetypeSignature : IEquatable<ArchetypeSignature>
+	internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
 	{
 		public static ArchetypeSignature Empty = new ArchetypeSignature(0);
 

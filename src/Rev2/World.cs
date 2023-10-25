@@ -7,8 +7,13 @@ namespace MoonTools.ECS.Rev2
 {
 	public class World : IDisposable
 	{
+		// Get ComponentId from a Type
+		internal static Dictionary<Type, ComponentId> TypeToComponentId = new Dictionary<Type, ComponentId>();
+		// Get element size from a ComponentId
+		internal static Dictionary<ComponentId, int> ElementSizes = new Dictionary<ComponentId, int>();
+
 		// Lookup from ArchetypeSignature to Archetype
-		Dictionary<ArchetypeSignature, Archetype> ArchetypeIndex = new Dictionary<ArchetypeSignature, Archetype>();
+		internal Dictionary<ArchetypeSignature, Archetype> ArchetypeIndex = new Dictionary<ArchetypeSignature, Archetype>();
 
 		// Going from EntityId to Archetype and storage row
 		Dictionary<EntityId, Record> EntityIndex = new Dictionary<EntityId, Record>();
@@ -16,18 +21,13 @@ namespace MoonTools.ECS.Rev2
 		// Going from ComponentId to Archetype list
 		Dictionary<ComponentId, List<Archetype>> ComponentIndex = new Dictionary<ComponentId, List<Archetype>>();
 
-		// Get ComponentId from a Type
-		Dictionary<Type, ComponentId> TypeToComponentId = new Dictionary<Type, ComponentId>();
-
-		// Get element size from a ComponentId
-		Dictionary<ComponentId, int> ElementSizes = new Dictionary<ComponentId, int>();
-
 		// ID Management
-		IdAssigner<ArchetypeId> ArchetypeIdAssigner = new IdAssigner<ArchetypeId>();
 		IdAssigner<EntityId> EntityIdAssigner = new IdAssigner<EntityId>();
 		IdAssigner<ComponentId> ComponentIdAssigner = new IdAssigner<ComponentId>();
 
-		public readonly Archetype EmptyArchetype;
+		internal readonly Archetype EmptyArchetype;
+
+		public FilterBuilder FilterBuilder => new FilterBuilder(this);
 
 		private bool IsDisposed;
 
@@ -39,12 +39,11 @@ namespace MoonTools.ECS.Rev2
 			EmptyArchetype = CreateArchetype(ArchetypeSignature.Empty);
 		}
 
-		private Archetype CreateArchetype(ArchetypeSignature signature)
+		internal Archetype CreateArchetype(ArchetypeSignature signature)
 		{
-			var archetypeId = ArchetypeIdAssigner.Assign();
-			var archetype = new Archetype(archetypeId, signature)
+			var archetype = new Archetype(this, signature)
 			{
-				Components = new List<Column>(signature.Count)
+				ComponentColumns = new List<Column>(signature.Count)
 			};
 
 			ArchetypeIndex.Add(signature, archetype);
@@ -52,9 +51,9 @@ namespace MoonTools.ECS.Rev2
 			for (int i = 0; i < signature.Count; i += 1)
 			{
 				var componentId = signature[i];
-				ComponentIndex[componentId].Add(archetype); //, new ArchetypeRecord(i));
-				archetype.ComponentToColumnIndex.Add(componentId, archetype.Components.Count);
-				archetype.Components.Add(new Column(ElementSizes[componentId]));
+				ComponentIndex[componentId].Add(archetype);
+				archetype.ComponentToColumnIndex.Add(componentId, archetype.ComponentColumns.Count);
+				archetype.ComponentColumns.Add(new Column(ElementSizes[componentId]));
 			}
 
 			return archetype;
@@ -63,10 +62,25 @@ namespace MoonTools.ECS.Rev2
 		public EntityId CreateEntity()
 		{
 			var entityId = EntityIdAssigner.Assign();
-			var emptyArchetype = ArchetypeIndex[ArchetypeSignature.Empty];
-			EntityIndex.Add(entityId, new Record(emptyArchetype, emptyArchetype.Count));
-			emptyArchetype.RowToEntity.Add(entityId);
+			EntityIndex.Add(entityId, new Record(EmptyArchetype, EmptyArchetype.Count));
+			EmptyArchetype.RowToEntity.Add(entityId);
 			return entityId;
+		}
+
+		// used as a fast path by Archetype.Transfer
+		internal EntityId CreateEntityOnArchetype(Archetype archetype)
+		{
+			var entityId = EntityIdAssigner.Assign();
+			EntityIndex.Add(entityId, new Record(archetype, archetype.Count));
+			archetype.RowToEntity.Add(entityId);
+			return entityId;
+		}
+
+		// used as a fast path by Archetype.ClearAll
+		internal void FreeEntity(EntityId entityId)
+		{
+			EntityIndex.Remove(entityId);
+			EntityIdAssigner.Unassign(entityId);
 		}
 
 		// FIXME: would be much more efficient to do all this at load time somehow
@@ -80,9 +94,18 @@ namespace MoonTools.ECS.Rev2
 
 		private void TryRegisterComponentId<T>() where T : unmanaged
 		{
-			if (!TypeToComponentId.TryGetValue(typeof(T), out var componentId))
+			if (!TypeToComponentId.ContainsKey(typeof(T)))
 			{
 				RegisterComponent<T>();
+			}
+		}
+
+		// non-generic variant for use with Transfer
+		internal void AddComponentIndexEntry(ComponentId componentId)
+		{
+			if (!ComponentIndex.ContainsKey(componentId))
+			{
+				ComponentIndex.Add(componentId, new List<Archetype>());
 			}
 		}
 
@@ -106,7 +129,7 @@ namespace MoonTools.ECS.Rev2
 
 			var record = EntityIndex[entityId];
 			var columnIndex = record.Archetype.ComponentToColumnIndex[componentId];
-			var column = record.Archetype.Components[columnIndex];
+			var column = record.Archetype.ComponentColumns[columnIndex];
 
 			return ref ((T*) column.Elements)[record.Row];
 		}
@@ -120,7 +143,7 @@ namespace MoonTools.ECS.Rev2
 			{
 				var record = EntityIndex[entityId];
 				var columnIndex = record.Archetype.ComponentToColumnIndex[componentId];
-				var column = record.Archetype.Components[columnIndex];
+				var column = record.Archetype.ComponentColumns[columnIndex];
 
 				((T*) column.Elements)[record.Row] = component;
 			}
@@ -165,7 +188,7 @@ namespace MoonTools.ECS.Rev2
 
 			// add the new component to the new archetype
 			var columnIndex = nextArchetype.ComponentToColumnIndex[componentId];
-			var column = nextArchetype.Components[columnIndex];
+			var column = nextArchetype.ComponentColumns[columnIndex];
 			column.Append(component);
 		}
 
@@ -207,9 +230,9 @@ namespace MoonTools.ECS.Rev2
 			var archetype = record.Archetype;
 			var row = record.Row;
 
-			for (int i = 0; i < archetype.Components.Count; i += 1)
+			for (int i = 0; i < archetype.ComponentColumns.Count; i += 1)
 			{
-				archetype.Components[i].Delete(row);
+				archetype.ComponentColumns[i].Delete(row);
 			}
 
 			if (row != archetype.Count - 1)
@@ -227,16 +250,16 @@ namespace MoonTools.ECS.Rev2
 
 		private void MoveEntityToHigherArchetype(EntityId entityId, int row, Archetype from, Archetype to)
 		{
-			for (int i = 0; i < from.Components.Count; i += 1)
+			for (int i = 0; i < from.ComponentColumns.Count; i += 1)
 			{
 				var componentId = from.Signature[i];
 				var destinationColumnIndex = to.ComponentToColumnIndex[componentId];
 
 				// copy all components to higher archetype
-				from.Components[i].CopyToEnd(row, to.Components[destinationColumnIndex]);
+				from.ComponentColumns[i].CopyElementToEnd(row, to.ComponentColumns[destinationColumnIndex]);
 
 				// delete row on from archetype
-				from.Components[i].Delete(row);
+				from.ComponentColumns[i].Delete(row);
 			}
 
 			if (row != from.Count - 1)
@@ -256,18 +279,18 @@ namespace MoonTools.ECS.Rev2
 
 		private void MoveEntityToLowerArchetype(EntityId entityId, int row, Archetype from, Archetype to, ComponentId removed)
 		{
-			for (int i = 0; i < from.Components.Count; i += 1)
+			for (int i = 0; i < from.ComponentColumns.Count; i += 1)
 			{
 				var componentId = from.Signature[i];
 
 				// delete the row
-				from.Components[i].Delete(row);
+				from.ComponentColumns[i].Delete(row);
 
 				// if this isn't the removed component, copy to the lower archetype
 				if (componentId != removed)
 				{
 					var destinationColumnIndex = to.ComponentToColumnIndex[componentId];
-					from.Components[i].CopyToEnd(row, to.Components[destinationColumnIndex]);
+					from.ComponentColumns[i].CopyElementToEnd(row, to.ComponentColumns[destinationColumnIndex]);
 				}
 			}
 
@@ -293,11 +316,11 @@ namespace MoonTools.ECS.Rev2
 			{
 				var componentIdOne = archetype.Signature[0];
 				var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
-				var columnOneElements = archetype.Components[columnIndexOne].Elements;
+				var columnOneElements = archetype.ComponentColumns[columnIndexOne].Elements;
 
 				var componentIdTwo = archetype.Signature[1];
 				var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
-				var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
+				var columnTwoElements = archetype.ComponentColumns[columnIndexTwo].Elements;
 
 				for (int i = archetype.Count - 1; i >= 0; i -= 1)
 				{
@@ -312,11 +335,11 @@ namespace MoonTools.ECS.Rev2
 			{
 				var componentIdOne = archetype.Signature[0];
 				var columnIndexOne = archetype.ComponentToColumnIndex[componentIdOne];
-				var columnOneElements = archetype.Components[columnIndexOne].Elements;
+				var columnOneElements = archetype.ComponentColumns[columnIndexOne].Elements;
 
 				var componentIdTwo = archetype.Signature[1];
 				var columnIndexTwo = archetype.ComponentToColumnIndex[componentIdTwo];
-				var columnTwoElements = archetype.Components[columnIndexTwo].Elements;
+				var columnTwoElements = archetype.ComponentColumns[columnIndexTwo].Elements;
 
 				for (int i = archetype.Count - 1; i >= 0; i -= 1)
 				{
@@ -336,7 +359,7 @@ namespace MoonTools.ECS.Rev2
 					{
 						for (var i = 0; i < archetype.Signature.Count; i += 1)
 						{
-							archetype.Components[i].Dispose();
+							archetype.ComponentColumns[i].Dispose();
 						}
 					}
 				}

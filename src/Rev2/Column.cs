@@ -3,12 +3,13 @@ using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS.Rev2
 {
-	public unsafe class Column : IDisposable
+	internal unsafe class Column : IDisposable
 	{
 		public nint Elements;
-		public int ElementSize;
 		public int Count;
-		public int Capacity;
+
+		private int Capacity;
+		private readonly int ElementSize;
 
 		private bool IsDisposed;
 
@@ -24,6 +25,12 @@ namespace MoonTools.ECS.Rev2
 		private void Resize()
 		{
 			Capacity *= 2;
+			Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
+		}
+
+		private void ResizeTo(int capacity)
+		{
+			Capacity = capacity;
 			Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
 		}
 
@@ -53,7 +60,7 @@ namespace MoonTools.ECS.Rev2
 			Count += 1;
 		}
 
-		public void CopyToEnd(int index, Column other)
+		public void CopyElementToEnd(int index, Column other)
 		{
 			if (other.Count >= other.Capacity)
 			{
@@ -67,6 +74,22 @@ namespace MoonTools.ECS.Rev2
 			);
 
 			other.Count += 1;
+		}
+
+		public void CopyAllTo(Column other)
+		{
+			if (Count >= other.Capacity)
+			{
+				other.ResizeTo(Count);
+			}
+
+			NativeMemory.Copy(
+				(void*) Elements,
+				(void*) other.Elements,
+				(nuint) (ElementSize * Count)
+			);
+
+			other.Count = Count;
 		}
 
 		protected virtual void Dispose(bool disposing)

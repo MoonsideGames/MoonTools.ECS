@@ -67,16 +67,15 @@ namespace MoonTools.ECS.Rev2
 			return entityId;
 		}
 
-		// used as a fast path by Archetype.Transfer
-		internal EntityId CreateEntityOnArchetype(Archetype archetype)
+		// used as a fast path by snapshot restore
+		internal void CreateEntityOnArchetype(Archetype archetype)
 		{
 			var entityId = EntityIdAssigner.Assign();
 			EntityIndex.Add(entityId, new Record(archetype, archetype.Count));
 			archetype.RowToEntity.Add(entityId);
-			return entityId;
 		}
 
-		// used as a fast path by Archetype.ClearAll
+		// used as a fast path by Archetype.ClearAll and snapshot restore
 		internal void FreeEntity(EntityId entityId)
 		{
 			EntityIndex.Remove(entityId);

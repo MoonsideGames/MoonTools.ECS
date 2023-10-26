@@ -87,23 +87,30 @@ public class Snapshot
 
 		public void Restore(Archetype archetype)
 		{
-			// Clear out existing entities
-			archetype.ClearAll();
-
 			// Copy all component data
 			for (int i = 0; i < ComponentColumns.Count; i += 1)
 			{
 				ComponentColumns[i].CopyAllTo(archetype.ComponentColumns[i]);
 			}
 
-			// Clear the row to entity list
-			archetype.RowToEntity.Clear();
+			var archetypeCount = archetype.Count;
 
-			// Create new entities and repopulate the row to entity list
-			for (int i = 0; i < Count; i += 1)
+			if (Count < archetypeCount)
 			{
-				var entityId = archetype.World.CreateEntityOnArchetype(archetype);
-				archetype.RowToEntity.Add(entityId);
+				// if snapshot has fewer entities than archetype, remove extra entities
+				for (int i = archetypeCount - 1; i >= Count; i -= 1)
+				{
+					archetype.World.FreeEntity(archetype.RowToEntity[i]);
+					archetype.RowToEntity.RemoveAt(i);
+				}
+			}
+			else if (Count > archetypeCount)
+			{
+				// if snapshot has more entities than archetype, add entities
+				for (int i = archetypeCount; i < Count; i += 1)
+				{
+					archetype.World.CreateEntityOnArchetype(archetype);
+				}
 			}
 		}
 	}

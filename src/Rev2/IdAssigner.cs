@@ -2,12 +2,12 @@ using System.Collections.Generic;
 
 namespace MoonTools.ECS.Rev2
 {
-	internal class IdAssigner<T> where T : struct, IHasId
+	internal class IdAssigner
 	{
-		int Next;
-		Queue<int> AvailableIds = new Queue<int>();
+		ulong Next;
+		Queue<ulong> AvailableIds = new Queue<ulong>();
 
-		public T Assign()
+		public Id Assign()
 		{
 			if (!AvailableIds.TryDequeue(out var id))
 			{
@@ -15,12 +15,12 @@ namespace MoonTools.ECS.Rev2
 				Next += 1;
 			}
 
-			return new T { Id = id };
+			return new Id(id);
 		}
 
-		public void Unassign(T idHaver)
+		public void Unassign(Id id)
 		{
-			AvailableIds.Enqueue(idHaver.Id);
+			AvailableIds.Enqueue(id.Value);
 		}
 	}
 }

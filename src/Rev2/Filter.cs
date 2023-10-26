@@ -7,8 +7,8 @@ namespace MoonTools.ECS.Rev2
 	public class Filter
 	{
 		private Archetype EmptyArchetype;
-		private HashSet<ComponentId> Included;
-		private HashSet<ComponentId> Excluded;
+		private HashSet<Id> Included;
+		private HashSet<Id> Excluded;
 
 		public EntityEnumerator Entities => new EntityEnumerator(this);
 		internal ArchetypeEnumerator Archetypes => new ArchetypeEnumerator(this);
@@ -47,7 +47,7 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
-		public EntityId RandomEntity
+		public Id RandomEntity
 		{
 			get
 			{
@@ -57,7 +57,7 @@ namespace MoonTools.ECS.Rev2
 		}
 
 		// WARNING: this WILL crash if the index is out of range!
-		public EntityId NthEntity(int index)
+		public Id NthEntity(int index)
 		{
 			var count = 0;
 
@@ -93,7 +93,7 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
-		internal Filter(Archetype emptyArchetype, HashSet<ComponentId> included, HashSet<ComponentId> excluded)
+		internal Filter(Archetype emptyArchetype, HashSet<Id> included, HashSet<Id> excluded)
 		{
 			EmptyArchetype = emptyArchetype;
 			Included = included;
@@ -165,12 +165,12 @@ namespace MoonTools.ECS.Rev2
 
 		public ref struct EntityEnumerator
 		{
-			private EntityId CurrentEntity;
+			private Id CurrentEntity;
 
 			public EntityEnumerator GetEnumerator() => this;
 
 			// TODO: pool this
-			Queue<EntityId> EntityQueue = new Queue<EntityId>();
+			Queue<Id> EntityQueue = new Queue<Id>();
 
 			internal EntityEnumerator(Filter filter)
 			{
@@ -190,7 +190,7 @@ namespace MoonTools.ECS.Rev2
 				return EntityQueue.TryDequeue(out CurrentEntity);
 			}
 
-			public EntityId Current => CurrentEntity;
+			public Id Current => CurrentEntity;
 		}
 
 		public ref struct RandomEntityEnumerator
@@ -208,7 +208,7 @@ namespace MoonTools.ECS.Rev2
 			}
 
 			public bool MoveNext() => LinearCongruentialEnumerator.MoveNext();
-			public EntityId Current => Filter.NthEntity(LinearCongruentialEnumerator.Current);
+			public Id Current => Filter.NthEntity(LinearCongruentialEnumerator.Current);
 		}
 	}
 }

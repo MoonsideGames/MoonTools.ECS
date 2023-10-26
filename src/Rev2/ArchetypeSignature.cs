@@ -7,36 +7,36 @@ namespace MoonTools.ECS.Rev2
 	{
 		public static ArchetypeSignature Empty = new ArchetypeSignature(0);
 
-		List<int> Ids;
+		List<ulong> Ids;
 
 		public int Count => Ids.Count;
 
-		public ComponentId this[int i] => new ComponentId(Ids[i]);
+		public Id this[int i] => new Id(Ids[i]);
 
 		public ArchetypeSignature()
 		{
-			Ids = new List<int>();
+			Ids = new List<ulong>();
 		}
 
 		public ArchetypeSignature(int capacity)
 		{
-			Ids = new List<int>(capacity);
+			Ids = new List<ulong>(capacity);
 		}
 
 		// Maintains sorted order
-		public void Insert(ComponentId componentId)
+		public void Insert(Id componentId)
 		{
-			var index = Ids.BinarySearch(componentId.Id);
+			var index = Ids.BinarySearch(componentId.Value);
 
 			if (index < 0)
 			{
-				Ids.Insert(~index, componentId.Id);
+				Ids.Insert(~index, componentId.Value);
 			}
 		}
 
-		public void Remove(ComponentId componentId)
+		public void Remove(Id componentId)
 		{
-			var index = Ids.BinarySearch(componentId.Id);
+			var index = Ids.BinarySearch(componentId.Value);
 
 			if (index >= 0)
 			{

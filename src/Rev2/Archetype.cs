@@ -7,11 +7,11 @@ internal class Archetype
 	public World World;
 	public ArchetypeSignature Signature;
 	public List<Column> ComponentColumns = new List<Column>();
-	public List<EntityId> RowToEntity = new List<EntityId>();
+	public List<Id> RowToEntity = new List<Id>();
 
-	public Dictionary<ComponentId, int> ComponentToColumnIndex =
-		new Dictionary<ComponentId, int>();
-	public SortedDictionary<ComponentId, ArchetypeEdge> Edges = new SortedDictionary<ComponentId, ArchetypeEdge>();
+	public Dictionary<Id, int> ComponentToColumnIndex =
+		new Dictionary<Id, int>();
+	public SortedDictionary<Id, ArchetypeEdge> Edges = new SortedDictionary<Id, ArchetypeEdge>();
 
 	public int Count => RowToEntity.Count;
 

@@ -8,22 +8,21 @@ namespace MoonTools.ECS.Rev2
 	public class World : IDisposable
 	{
 		// Get ComponentId from a Type
-		internal static Dictionary<Type, ComponentId> TypeToComponentId = new Dictionary<Type, ComponentId>();
+		internal static Dictionary<Type, Id> TypeToComponentId = new Dictionary<Type, Id>();
 		// Get element size from a ComponentId
-		internal static Dictionary<ComponentId, int> ElementSizes = new Dictionary<ComponentId, int>();
+		internal static Dictionary<Id, int> ElementSizes = new Dictionary<Id, int>();
 
 		// Lookup from ArchetypeSignature to Archetype
 		internal Dictionary<ArchetypeSignature, Archetype> ArchetypeIndex = new Dictionary<ArchetypeSignature, Archetype>();
 
 		// Going from EntityId to Archetype and storage row
-		Dictionary<EntityId, Record> EntityIndex = new Dictionary<EntityId, Record>();
+		Dictionary<Id, Record> EntityIndex = new Dictionary<Id, Record>();
 
 		// Going from ComponentId to Archetype list
-		Dictionary<ComponentId, List<Archetype>> ComponentIndex = new Dictionary<ComponentId, List<Archetype>>();
+		Dictionary<Id, List<Archetype>> ComponentIndex = new Dictionary<Id, List<Archetype>>();
 
 		// ID Management
-		IdAssigner<EntityId> EntityIdAssigner = new IdAssigner<EntityId>();
-		IdAssigner<ComponentId> ComponentIdAssigner = new IdAssigner<ComponentId>();
+		IdAssigner IdAssigner = new IdAssigner();
 
 		internal readonly Archetype EmptyArchetype;
 
@@ -59,9 +58,9 @@ namespace MoonTools.ECS.Rev2
 			return archetype;
 		}
 
-		public EntityId CreateEntity()
+		public Id CreateEntity()
 		{
-			var entityId = EntityIdAssigner.Assign();
+			var entityId = IdAssigner.Assign();
 			EntityIndex.Add(entityId, new Record(EmptyArchetype, EmptyArchetype.Count));
 			EmptyArchetype.RowToEntity.Add(entityId);
 			return entityId;
@@ -70,25 +69,39 @@ namespace MoonTools.ECS.Rev2
 		// used as a fast path by snapshot restore
 		internal void CreateEntityOnArchetype(Archetype archetype)
 		{
-			var entityId = EntityIdAssigner.Assign();
+			var entityId = IdAssigner.Assign();
 			EntityIndex.Add(entityId, new Record(archetype, archetype.Count));
 			archetype.RowToEntity.Add(entityId);
 		}
 
 		// used as a fast path by Archetype.ClearAll and snapshot restore
-		internal void FreeEntity(EntityId entityId)
+		internal void FreeEntity(Id entityId)
 		{
 			EntityIndex.Remove(entityId);
-			EntityIdAssigner.Unassign(entityId);
+			IdAssigner.Unassign(entityId);
+		}
+
+		private void RegisterTypeId(Id typeId, int elementSize)
+		{
+			ComponentIndex.Add(typeId, new List<Archetype>());
+			ElementSizes.Add(typeId, elementSize);
 		}
 
 		// FIXME: would be much more efficient to do all this at load time somehow
 		private void RegisterComponent<T>() where T : unmanaged
 		{
-			var componentId = ComponentIdAssigner.Assign();
+			var componentId = IdAssigner.Assign();
 			TypeToComponentId.Add(typeof(T), componentId);
 			ComponentIndex.Add(componentId, new List<Archetype>());
 			ElementSizes.Add(componentId, Unsafe.SizeOf<T>());
+		}
+
+		private void TryRegisterTypeId(Id typeId, int elementSize)
+		{
+			if (!ComponentIndex.ContainsKey(typeId))
+			{
+				RegisterTypeId(typeId, elementSize);
+			}
 		}
 
 		private void TryRegisterComponentId<T>() where T : unmanaged
@@ -99,22 +112,13 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
-		// non-generic variant for use with Transfer
-		internal void AddComponentIndexEntry(ComponentId componentId)
-		{
-			if (!ComponentIndex.ContainsKey(componentId))
-			{
-				ComponentIndex.Add(componentId, new List<Archetype>());
-			}
-		}
-
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		private ComponentId GetComponentId<T>() where T : unmanaged
+		private Id GetComponentId<T>() where T : unmanaged
 		{
 			return TypeToComponentId[typeof(T)];
 		}
 
-		public bool Has<T>(EntityId entityId) where T : unmanaged
+		public bool Has<T>(Id entityId) where T : unmanaged
 		{
 			var componentId = GetComponentId<T>();
 			var record = EntityIndex[entityId];
@@ -122,7 +126,7 @@ namespace MoonTools.ECS.Rev2
 		}
 
 		// will throw if non-existent
-		public unsafe ref T Get<T>(EntityId entityId) where T : unmanaged
+		public unsafe ref T Get<T>(Id entityId) where T : unmanaged
 		{
 			var componentId = GetComponentId<T>();
 
@@ -133,7 +137,7 @@ namespace MoonTools.ECS.Rev2
 			return ref ((T*) column.Elements)[record.Row];
 		}
 
-		public unsafe void Set<T>(in EntityId entityId, in T component) where T : unmanaged
+		public unsafe void Set<T>(in Id entityId, in T component) where T : unmanaged
 		{
 			TryRegisterComponentId<T>();
 			var componentId = GetComponentId<T>();
@@ -152,7 +156,7 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
-		private void Add<T>(EntityId entityId, in T component) where T : unmanaged
+		private void Add<T>(Id entityId, in T component) where T : unmanaged
 		{
 			Archetype? nextArchetype;
 
@@ -191,7 +195,7 @@ namespace MoonTools.ECS.Rev2
 			column.Append(component);
 		}
 
-		public void Remove<T>(EntityId entityId) where T : unmanaged
+		public void Remove<T>(Id entityId) where T : unmanaged
 		{
 			Archetype? nextArchetype;
 
@@ -223,7 +227,105 @@ namespace MoonTools.ECS.Rev2
 			MoveEntityToLowerArchetype(entityId, row, archetype, nextArchetype, componentId);
 		}
 
-		public void Destroy(EntityId entityId)
+		private Id Pair(in Id relation, in Id target)
+		{
+			return new Id(relation.Low, target.Low);
+		}
+
+		public void Relate<T>(in Id entityA, in Id entityB, in T relation) where T : unmanaged
+		{
+			TryRegisterComponentId<T>();
+			var relationDataTypeId = GetComponentId<T>();
+
+			var typeId = Pair(relationDataTypeId, entityB);
+
+			TryRegisterTypeId(typeId, Unsafe.SizeOf<T>());
+			SetRelationData(entityA, typeId, relation);
+		}
+
+		public bool Related<T>(in Id entityA, in Id entityB) where T : unmanaged
+		{
+			var relationDataTypeId = GetComponentId<T>();
+			var typeId = Pair(relationDataTypeId, entityB);
+			return Has(entityA, typeId);
+		}
+
+		public T GetRelationData<T>(in Id entityA, in Id entityB) where T : unmanaged
+		{
+			var relationDataTypeId = GetComponentId<T>();
+			var typeId = Pair(relationDataTypeId, entityB);
+			return Get<T>(entityA, typeId);
+		}
+
+		private unsafe ref T Get<T>(Id entityId, Id typeId) where T : unmanaged
+		{
+			var record = EntityIndex[entityId];
+			var columnIndex = record.Archetype.ComponentToColumnIndex[typeId];
+			var column = record.Archetype.ComponentColumns[columnIndex];
+
+			return ref ((T*) column.Elements)[record.Row];
+		}
+
+		private bool Has(Id entityId, Id typeId)
+		{
+			var record = EntityIndex[entityId];
+			return record.Archetype.ComponentToColumnIndex.ContainsKey(typeId);
+		}
+
+		private void Add<T>(Id entityId, Id typeId, in T component) where T : unmanaged
+		{
+			Archetype? nextArchetype;
+
+			// move the entity to the new archetype
+			var record = EntityIndex[entityId];
+			var archetype = record.Archetype;
+
+			if (archetype.Edges.TryGetValue(typeId, out var edge))
+			{
+				nextArchetype = edge.Add;
+			}
+			else
+			{
+				// FIXME: pool the signatures
+				var nextSignature = new ArchetypeSignature(archetype.Signature.Count + 1);
+				archetype.Signature.CopyTo(nextSignature);
+				nextSignature.Insert(typeId);
+
+				if (!ArchetypeIndex.TryGetValue(nextSignature, out nextArchetype))
+				{
+					nextArchetype = CreateArchetype(nextSignature);
+				}
+
+				var newEdge = new ArchetypeEdge(nextArchetype, archetype);
+				archetype.Edges.Add(typeId, newEdge);
+				nextArchetype.Edges.Add(typeId, newEdge);
+			}
+
+			MoveEntityToHigherArchetype(entityId, record.Row, archetype, nextArchetype);
+
+			// add the new component to the new archetype
+			var columnIndex = nextArchetype.ComponentToColumnIndex[typeId];
+			var column = nextArchetype.ComponentColumns[columnIndex];
+			column.Append(component);
+		}
+
+		private unsafe void SetRelationData<T>(in Id entityId, in Id typeId, T data) where T : unmanaged
+		{
+			if (Has(entityId, typeId))
+			{
+				var record = EntityIndex[entityId];
+				var columnIndex = record.Archetype.ComponentToColumnIndex[typeId];
+				var column = record.Archetype.ComponentColumns[columnIndex];
+
+				((T*) column.Elements)[record.Row] = data;
+			}
+			else
+			{
+				Add(entityId, typeId, data);
+			}
+		}
+
+		public void Destroy(Id entityId)
 		{
 			var record = EntityIndex[entityId];
 			var archetype = record.Archetype;
@@ -244,10 +346,10 @@ namespace MoonTools.ECS.Rev2
 
 			archetype.RowToEntity.RemoveAt(archetype.Count - 1);
 			EntityIndex.Remove(entityId);
-			EntityIdAssigner.Unassign(entityId);
+			IdAssigner.Unassign(entityId);
 		}
 
-		private void MoveEntityToHigherArchetype(EntityId entityId, int row, Archetype from, Archetype to)
+		private void MoveEntityToHigherArchetype(Id entityId, int row, Archetype from, Archetype to)
 		{
 			for (int i = 0; i < from.ComponentColumns.Count; i += 1)
 			{
@@ -276,7 +378,7 @@ namespace MoonTools.ECS.Rev2
 			to.RowToEntity.Add(entityId);
 		}
 
-		private void MoveEntityToLowerArchetype(EntityId entityId, int row, Archetype from, Archetype to, ComponentId removed)
+		private void MoveEntityToLowerArchetype(Id entityId, int row, Archetype from, Archetype to, Id removed)
 		{
 			for (int i = 0; i < from.ComponentColumns.Count; i += 1)
 			{

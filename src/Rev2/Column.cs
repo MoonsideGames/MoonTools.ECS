@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace MoonTools.ECS.Rev2
@@ -22,13 +23,19 @@ namespace MoonTools.ECS.Rev2
 			Elements = (nint) NativeMemory.Alloc((nuint) (ElementSize * Capacity));
 		}
 
-		private void Resize()
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public ref T Get<T>(int i) where T : unmanaged
+		{
+			return ref ((T*) Elements)[i];
+		}
+
+		public void Resize()
 		{
 			Capacity *= 2;
 			Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
 		}
 
-		private void ResizeTo(int capacity)
+		public void ResizeTo(int capacity)
 		{
 			Capacity = capacity;
 			Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));

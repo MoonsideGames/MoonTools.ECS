@@ -83,16 +83,6 @@ namespace MoonTools.ECS.Rev2
 			}
 		}
 
-		public void TakeSnapshot(Snapshot snapshot)
-		{
-			snapshot.Reset();
-
-			foreach (var archetype in Archetypes)
-			{
-				snapshot.TakeArchetypeSnapshot(archetype);
-			}
-		}
-
 		internal Filter(Archetype emptyArchetype, HashSet<Id> included, HashSet<Id> excluded)
 		{
 			EmptyArchetype = emptyArchetype;

@@ -1,26 +1,31 @@
-using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS.Rev2
+namespace MoonTools.ECS.Rev2;
+
+internal class IdAssigner
 {
-	internal class IdAssigner
+	ulong Next;
+	NativeArray<ulong> AvailableIds = new NativeArray<ulong>();
+
+	public Id Assign()
 	{
-		ulong Next;
-		Queue<ulong> AvailableIds = new Queue<ulong>();
-
-		public Id Assign()
+		if (!AvailableIds.TryPop(out var id))
 		{
-			if (!AvailableIds.TryDequeue(out var id))
-			{
-				id = Next;
-				Next += 1;
-			}
-
-			return new Id(id);
+			id = Next;
+			Next += 1;
 		}
 
-		public void Unassign(Id id)
-		{
-			AvailableIds.Enqueue(id.Value);
-		}
+		return new Id(id);
+	}
+
+	public void Unassign(Id id)
+	{
+		AvailableIds.Add(id.Value);
+	}
+
+	public void CopyTo(IdAssigner other)
+	{
+		AvailableIds.CopyTo(other.AvailableIds);
+		other.Next = Next;
 	}
 }

@@ -9,17 +9,19 @@ namespace MoonTools.ECS.Collections
 		private T* Array;
 		private int count;
 		private int capacity;
+		private int elementSize;
 
 		public int Count => count;
 
-		public ReverseSpanEnumerator<T> GetEnumerator() => new ReverseSpanEnumerator<T>(new Span<T>(Array, Count));
+		public Span<T>.Enumerator GetEnumerator() => new Span<T>(Array, count).GetEnumerator();
 
 		private bool disposed;
 
 		public NativeArray(int capacity = 16)
 		{
 			this.capacity = capacity;
-			Array = (T*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<T>()));
+			elementSize = Unsafe.SizeOf<T>();
+			Array = (T*) NativeMemory.Alloc((nuint) (capacity * elementSize));
 			count = 0;
 		}
 
@@ -37,9 +39,49 @@ namespace MoonTools.ECS.Collections
 			count += 1;
 		}
 
+		public void RemoveLastElement()
+		{
+			count -= 1;
+		}
+
+		public bool TryPop(out T element)
+		{
+			if (count > 0)
+			{
+				element = Array[count - 1];
+				count -= 1;
+				return true;
+			}
+
+			element = default;
+			return false;
+		}
+
 		public void Clear()
 		{
 			count = 0;
+		}
+
+		private void ResizeTo(int size)
+		{
+			capacity = size;
+			Array = (T*) NativeMemory.Realloc((void*) Array, (nuint) (elementSize * capacity));
+		}
+
+		public void CopyTo(NativeArray<T> other)
+		{
+			if (count >= other.capacity)
+			{
+				other.ResizeTo(Count);
+			}
+
+			NativeMemory.Copy(
+				(void*) Array,
+				(void*) other.Array,
+				(nuint) (elementSize * Count)
+			);
+
+			other.count = count;
 		}
 
 		protected virtual void Dispose(bool disposing)

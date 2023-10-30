@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS.Rev2;
 
@@ -6,8 +7,8 @@ internal class Archetype
 {
 	public World World;
 	public ArchetypeSignature Signature;
-	public List<Column> ComponentColumns = new List<Column>();
-	public List<Id> RowToEntity = new List<Id>();
+	public Column[] ComponentColumns;
+	public NativeArray<Id> RowToEntity = new NativeArray<Id>();
 
 	public Dictionary<Id, int> ComponentToColumnIndex =
 		new Dictionary<Id, int>();
@@ -19,11 +20,12 @@ internal class Archetype
 	{
 		World = world;
 		Signature = signature;
+		ComponentColumns = new Column[signature.Count];
 	}
 
 	public void ClearAll()
 	{
-		for (int i = 0; i < ComponentColumns.Count; i += 1)
+		for (int i = 0; i < ComponentColumns.Length; i += 1)
 		{
 			ComponentColumns[i].Count = 0;
 		}

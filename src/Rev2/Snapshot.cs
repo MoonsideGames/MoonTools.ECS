@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS.Rev2;
@@ -8,7 +9,14 @@ public class Snapshot
 	private Dictionary<ArchetypeSignature, ArchetypeSnapshot> ArchetypeSnapshots =
 		new Dictionary<ArchetypeSignature, ArchetypeSnapshot>();
 
+	private Dictionary<Id, RelationSnapshot> RelationSnapshots =
+		new Dictionary<Id, RelationSnapshot>();
+
 	private Dictionary<Id, Record> EntityIndex = new Dictionary<Id, Record>();
+
+	private Dictionary<Id, IndexableSet<Id>> EntityRelationIndex =
+		new Dictionary<Id, IndexableSet<Id>>();
+
 	private IdAssigner IdAssigner = new IdAssigner();
 
 	public int Count
@@ -32,7 +40,7 @@ public class Snapshot
 		foreach (var (archetypeSignature, archetypeSnapshot) in ArchetypeSnapshots)
 		{
 			var archetype = world.ArchetypeIndex[archetypeSignature];
-			RestoreArchetypeSnapshot(archetype);
+			archetypeSnapshot.Restore(archetype);
 		}
 
 		// restore entity index
@@ -44,6 +52,25 @@ public class Snapshot
 
 		// restore id assigner state
 		IdAssigner.CopyTo(world.IdAssigner);
+
+		// restore relation state
+		foreach (var (typeId, relationSnapshot) in RelationSnapshots)
+		{
+			var relationStorage = world.RelationIndex[typeId];
+			relationSnapshot.Restore(relationStorage);
+		}
+
+		// restore entity relation index state
+		// FIXME: arghhhh this is so slow
+		foreach (var (id, relationTypeSet) in EntityRelationIndex)
+		{
+			world.EntityRelationIndex[id].Clear();
+
+			foreach (var typeId in relationTypeSet)
+			{
+				world.EntityRelationIndex[id].Add(typeId);
+			}
+		}
 	}
 
 	public void Take(World world)
@@ -63,9 +90,32 @@ public class Snapshot
 		{
 			TakeArchetypeSnapshot(archetype);
 		}
+
+		// copy relations
+		foreach (var (typeId, relationStorage) in world.RelationIndex)
+		{
+			TakeRelationSnapshot(typeId, relationStorage);
+		}
+
+		// copy entity relation index
+		// FIXME: arghhhh this is so slow
+		foreach (var (id, relationTypeSet) in world.EntityRelationIndex)
+		{
+			if (!EntityRelationIndex.ContainsKey(id))
+			{
+				EntityRelationIndex.Add(id, new IndexableSet<Id>());
+			}
+
+			EntityRelationIndex[id].Clear();
+
+			foreach (var typeId in relationTypeSet)
+			{
+				EntityRelationIndex[id].Add(typeId);
+			}
+		}
 	}
 
-	internal void TakeArchetypeSnapshot(Archetype archetype)
+	private void TakeArchetypeSnapshot(Archetype archetype)
 	{
 		if (!ArchetypeSnapshots.TryGetValue(archetype.Signature, out var archetypeSnapshot))
 		{
@@ -76,15 +126,19 @@ public class Snapshot
 		archetypeSnapshot.Take(archetype);
 	}
 
-	private void RestoreArchetypeSnapshot(Archetype archetype)
+	private void TakeRelationSnapshot(Id typeId, RelationStorage relationStorage)
 	{
-		var archetypeSnapshot = ArchetypeSnapshots[archetype.Signature];
-		archetypeSnapshot.Restore(archetype);
+		if (!RelationSnapshots.TryGetValue(typeId, out var snapshot))
+		{
+			snapshot = new RelationSnapshot(World.ElementSizes[typeId]);
+			RelationSnapshots.Add(typeId, snapshot);
+		}
+
+		snapshot.Take(relationStorage);
 	}
 
 	private class ArchetypeSnapshot
 	{
-		public ArchetypeSignature Signature;
 		private readonly Column[] ComponentColumns;
 		private readonly NativeArray<Id> RowToEntity;
 
@@ -92,7 +146,6 @@ public class Snapshot
 
 		public ArchetypeSnapshot(ArchetypeSignature signature)
 		{
-			Signature = signature;
 			ComponentColumns = new Column[signature.Count];
 			RowToEntity = new NativeArray<Id>();
 
@@ -101,11 +154,6 @@ public class Snapshot
 				var componentId = signature[i];
 				ComponentColumns[i] = new Column(World.ElementSizes[componentId]);
 			}
-		}
-
-		public void Clear()
-		{
-			RowToEntity.Clear();
 		}
 
 		public void Take(Archetype archetype)
@@ -127,6 +175,56 @@ public class Snapshot
 			}
 
 			RowToEntity.CopyTo(archetype.RowToEntity);
+		}
+	}
+
+	private class RelationSnapshot
+	{
+		private Column Relations;
+		private Column RelationDatas;
+
+		public RelationSnapshot(int elementSize)
+		{
+			Relations = new Column(Unsafe.SizeOf<(Id, Id)>());
+			RelationDatas = new Column(elementSize);
+		}
+
+		public void Take(RelationStorage relationStorage)
+		{
+			relationStorage.relations.CopyAllTo(Relations);
+			relationStorage.relationDatas.CopyAllTo(RelationDatas);
+		}
+
+		public void Restore(RelationStorage relationStorage)
+		{
+			relationStorage.Clear();
+
+			Relations.CopyAllTo(relationStorage.relations);
+			RelationDatas.CopyAllTo(relationStorage.relationDatas);
+
+			for (int index = 0; index < Relations.Count; index += 1)
+			{
+				var relation = Relations.Get<(Id, Id)>(index);
+				relationStorage.indices[relation] = index;
+
+				relationStorage.indices[relation] = index;
+
+				if (!relationStorage.outRelations.ContainsKey(relation.Item1))
+				{
+					relationStorage.outRelations[relation.Item1] =
+						relationStorage.AcquireHashSetFromPool();
+				}
+
+				relationStorage.outRelations[relation.Item1].Add(relation.Item2);
+
+				if (!relationStorage.inRelations.ContainsKey(relation.Item2))
+				{
+					relationStorage.inRelations[relation.Item2] =
+						relationStorage.AcquireHashSetFromPool();
+				}
+
+				relationStorage.inRelations[relation.Item2].Add(relation.Item1);
+			}
 		}
 	}
 }

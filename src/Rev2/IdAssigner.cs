@@ -4,8 +4,8 @@ namespace MoonTools.ECS.Rev2;
 
 internal class IdAssigner
 {
-	ulong Next;
-	NativeArray<ulong> AvailableIds = new NativeArray<ulong>();
+	uint Next;
+	NativeArray<uint> AvailableIds = new NativeArray<uint>();
 
 	public Id Assign()
 	{

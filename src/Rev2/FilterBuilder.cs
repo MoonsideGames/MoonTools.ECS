@@ -24,13 +24,15 @@ namespace MoonTools.ECS.Rev2
 
 		public FilterBuilder Include<T>() where T : unmanaged
 		{
-			Included.Add(World.TypeToComponentId[typeof(T)]);
+			World.TryRegisterTypeId<T>();
+			Included.Add(World.TypeToId[typeof(T)]);
 			return new FilterBuilder(World, Included, Excluded);
 		}
 
 		public FilterBuilder Exclude<T>() where T : unmanaged
 		{
-			Excluded.Add(World.TypeToComponentId[typeof(T)]);
+			World.TryRegisterTypeId<T>();
+			Excluded.Add(World.TypeToId[typeof(T)]);
 			return new FilterBuilder(World, Included, Excluded);
 		}
 

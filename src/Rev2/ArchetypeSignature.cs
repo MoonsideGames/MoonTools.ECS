@@ -7,7 +7,7 @@ namespace MoonTools.ECS.Rev2
 	{
 		public static ArchetypeSignature Empty = new ArchetypeSignature(0);
 
-		List<ulong> Ids;
+		List<uint> Ids;
 
 		public int Count => Ids.Count;
 
@@ -15,12 +15,12 @@ namespace MoonTools.ECS.Rev2
 
 		public ArchetypeSignature()
 		{
-			Ids = new List<ulong>();
+			Ids = new List<uint>();
 		}
 
 		public ArchetypeSignature(int capacity)
 		{
-			Ids = new List<ulong>(capacity);
+			Ids = new List<uint>(capacity);
 		}
 
 		// Maintains sorted order

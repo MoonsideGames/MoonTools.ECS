@@ -5,28 +5,27 @@ using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS.Rev2;
 
-internal class Relation
+// TODO: implement this entire class with NativeMemory equivalents, can just memcpy for snapshots
+internal class RelationStorage
 {
-	private int count = 0;
-	private int capacity = 16;
-	private Column relations;
-	private Column relationDatas;
-	private Dictionary<(Id, Id), int> indices = new Dictionary<(Id, Id), int>(16);
-	private Dictionary<Id, IndexableSet<Id>> outRelations = new Dictionary<Id, IndexableSet<Id>>(16);
-	private Dictionary<Id, IndexableSet<Id>> inRelations = new Dictionary<Id, IndexableSet<Id>>(16);
+	internal Column relations;
+	internal Column relationDatas;
+	internal Dictionary<(Id, Id), int> indices = new Dictionary<(Id, Id), int>(16);
+	internal Dictionary<Id, IndexableSet<Id>> outRelations = new Dictionary<Id, IndexableSet<Id>>(16);
+	internal Dictionary<Id, IndexableSet<Id>> inRelations = new Dictionary<Id, IndexableSet<Id>>(16);
 	private Stack<IndexableSet<Id>> listPool = new Stack<IndexableSet<Id>>();
 
 	private bool disposed;
 
-	public Relation(int relationDataSize)
+	public RelationStorage(int relationDataSize)
 	{
 		relations = new Column(Unsafe.SizeOf<(Id, Id)>());
 		relationDatas = new Column(relationDataSize);
 	}
 
-	public unsafe ReverseSpanEnumerator<(Id, Id)> All()
+	public ReverseSpanEnumerator<(Id, Id)> All()
 	{
-		return new ReverseSpanEnumerator<(Id, Id)>(new Span<(Id, Id)>((void*) relations.Elements, count));
+		return new ReverseSpanEnumerator<(Id, Id)>(relations.ToSpan<(Id, Id)>());
 	}
 
 	public unsafe void Set<T>(in Id entityA, in Id entityB, in T relationData) where T : unmanaged
@@ -51,16 +50,9 @@ internal class Relation
 		}
 		inRelations[entityB].Add(entityA);
 
-		if (count >= capacity)
-		{
-			relations.Resize();
-			relationDatas.Resize();
-		}
-
-		(((Id, Id)*) relationDatas.Elements)[count] = relation;
-		((T*) relationDatas.Elements)[count] = relationData;
-		indices.Add(relation, count);
-		count += 1;
+		relations.Append(relation);
+		relationDatas.Append(relationData);
+		indices.Add(relation, relations.Count - 1);
 	}
 
 	public ref T Get<T>(in Id entityA, in Id entityB) where T : unmanaged
@@ -69,9 +61,9 @@ internal class Relation
 		return ref relationDatas.Get<T>(relationIndex);
 	}
 
-	public bool Has((Id, Id) relation)
+	public bool Has(Id entityA, Id entityB)
 	{
-		return indices.ContainsKey(relation);
+		return indices.ContainsKey((entityA, entityB));
 	}
 
 	public ReverseSpanEnumerator<Id> OutRelations(Id entityID)
@@ -177,10 +169,10 @@ internal class Relation
 
 		if (indices.TryGetValue(relation, out var index))
 		{
+			var lastElementIndex = relations.Count - 1;
+
 			relationDatas.Delete(index);
 			relations.Delete(index);
-
-			var lastElementIndex = count - 1;
 
 			// move an element into the hole
 			if (index != lastElementIndex)
@@ -189,14 +181,38 @@ internal class Relation
 				indices[lastRelation] = index;
 			}
 
-			count -= 1;
 			indices.Remove(relation);
 		}
 
 		return (aEmpty, bEmpty);
 	}
 
-	private IndexableSet<Id> AcquireHashSetFromPool()
+	public void RemoveEntity(Id entity)
+	{
+		if (outRelations.TryGetValue(entity, out var entityOutRelations))
+		{
+			foreach (var entityB in entityOutRelations)
+			{
+				Remove(entity, entityB);
+			}
+
+			ReturnHashSetToPool(entityOutRelations);
+			outRelations.Remove(entity);
+		}
+
+		if (inRelations.TryGetValue(entity, out var entityInRelations))
+		{
+			foreach (var entityA in entityInRelations)
+			{
+				Remove(entityA, entity);
+			}
+
+			ReturnHashSetToPool(entityInRelations);
+			inRelations.Remove(entity);
+		}
+	}
+
+	internal IndexableSet<Id> AcquireHashSetFromPool()
 	{
 		if (listPool.Count == 0)
 		{
@@ -214,7 +230,6 @@ internal class Relation
 
 	public void Clear()
 	{
-		count = 0;
 		indices.Clear();
 
 		foreach (var set in inRelations.Values)
@@ -228,6 +243,9 @@ internal class Relation
 			ReturnHashSetToPool(set);
 		}
 		outRelations.Clear();
+
+		relations.Count = 0;
+		relationDatas.Count = 0;
 	}
 
 	protected virtual void Dispose(bool disposing)

@@ -10,7 +10,7 @@ namespace MoonTools.ECS.Rev2
 		public int Count;
 
 		private int Capacity;
-		private readonly int ElementSize;
+		public readonly int ElementSize;
 
 		private bool IsDisposed;
 
@@ -21,6 +21,11 @@ namespace MoonTools.ECS.Rev2
 			ElementSize = elementSize;
 
 			Elements = (nint) NativeMemory.Alloc((nuint) (ElementSize * Capacity));
+		}
+
+		public Span<T> ToSpan<T>()
+		{
+			return new Span<T>((void*) Elements, Count);
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]

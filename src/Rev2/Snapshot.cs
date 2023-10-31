@@ -9,15 +9,15 @@ public class Snapshot
 	private Dictionary<ArchetypeSignature, ArchetypeSnapshot> ArchetypeSnapshots =
 		new Dictionary<ArchetypeSignature, ArchetypeSnapshot>();
 
-	private Dictionary<Id, RelationSnapshot> RelationSnapshots =
-		new Dictionary<Id, RelationSnapshot>();
+	private Dictionary<TypeId, RelationSnapshot> RelationSnapshots =
+		new Dictionary<TypeId, RelationSnapshot>();
 
-	private Dictionary<Id, Record> EntityIndex = new Dictionary<Id, Record>();
+	private Dictionary<EntityId, Record> EntityIndex = new Dictionary<EntityId, Record>();
 
-	private Dictionary<Id, IndexableSet<Id>> EntityRelationIndex =
-		new Dictionary<Id, IndexableSet<Id>>();
+	private Dictionary<EntityId, IndexableSet<TypeId>> EntityRelationIndex =
+		new Dictionary<EntityId, IndexableSet<TypeId>>();
 
-	private IdAssigner IdAssigner = new IdAssigner();
+	private IdAssigner EntityIdAssigner = new IdAssigner();
 
 	public int Count
 	{
@@ -51,7 +51,7 @@ public class Snapshot
 		}
 
 		// restore id assigner state
-		IdAssigner.CopyTo(world.IdAssigner);
+		EntityIdAssigner.CopyTo(world.EntityIdAssigner);
 
 		// restore relation state
 		foreach (var (typeId, relationSnapshot) in RelationSnapshots)
@@ -76,7 +76,7 @@ public class Snapshot
 	public void Take(World world)
 	{
 		// copy id assigner state
-		world.IdAssigner.CopyTo(IdAssigner);
+		world.EntityIdAssigner.CopyTo(EntityIdAssigner);
 
 		// copy entity index
 		EntityIndex.Clear();
@@ -103,7 +103,7 @@ public class Snapshot
 		{
 			if (!EntityRelationIndex.ContainsKey(id))
 			{
-				EntityRelationIndex.Add(id, new IndexableSet<Id>());
+				EntityRelationIndex.Add(id, new IndexableSet<TypeId>());
 			}
 
 			EntityRelationIndex[id].Clear();
@@ -126,7 +126,7 @@ public class Snapshot
 		archetypeSnapshot.Take(archetype);
 	}
 
-	private void TakeRelationSnapshot(Id typeId, RelationStorage relationStorage)
+	private void TakeRelationSnapshot(TypeId typeId, RelationStorage relationStorage)
 	{
 		if (!RelationSnapshots.TryGetValue(typeId, out var snapshot))
 		{
@@ -140,14 +140,14 @@ public class Snapshot
 	private class ArchetypeSnapshot
 	{
 		private readonly NativeArray[] ComponentColumns;
-		private readonly NativeArray<Id> RowToEntity;
+		private readonly NativeArray<EntityId> RowToEntity;
 
 		public int Count => RowToEntity.Count;
 
 		public ArchetypeSnapshot(ArchetypeSignature signature)
 		{
 			ComponentColumns = new NativeArray[signature.Count];
-			RowToEntity = new NativeArray<Id>();
+			RowToEntity = new NativeArray<EntityId>();
 
 			for (int i = 0; i < signature.Count; i += 1)
 			{
@@ -185,7 +185,7 @@ public class Snapshot
 
 		public RelationSnapshot(int elementSize)
 		{
-			Relations = new NativeArray(Unsafe.SizeOf<(Id, Id)>());
+			Relations = new NativeArray(Unsafe.SizeOf<(EntityId, EntityId)>());
 			RelationDatas = new NativeArray(elementSize);
 		}
 
@@ -204,7 +204,7 @@ public class Snapshot
 
 			for (int index = 0; index < Relations.Count; index += 1)
 			{
-				var relation = Relations.Get<(Id, Id)>(index);
+				var relation = Relations.Get<(EntityId, EntityId)>(index);
 				relationStorage.indices[relation] = index;
 
 				relationStorage.indices[relation] = index;

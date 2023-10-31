@@ -5,17 +5,17 @@ namespace MoonTools.ECS.Rev2;
 public ref struct FilterBuilder
 {
 	World World;
-	HashSet<Id> Included;
-	HashSet<Id> Excluded;
+	HashSet<TypeId> Included;
+	HashSet<TypeId> Excluded;
 
 	internal FilterBuilder(World world)
 	{
 		World = world;
-		Included = new HashSet<Id>();
-		Excluded = new HashSet<Id>();
+		Included = new HashSet<TypeId>();
+		Excluded = new HashSet<TypeId>();
 	}
 
-	private FilterBuilder(World world, HashSet<Id> included, HashSet<Id> excluded)
+	private FilterBuilder(World world, HashSet<TypeId> included, HashSet<TypeId> excluded)
 	{
 		World = world;
 		Included = included;

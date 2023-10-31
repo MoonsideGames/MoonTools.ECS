@@ -11,7 +11,7 @@ internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
 
 	public int Count => Ids.Count;
 
-	public Id this[int i] => new Id(Ids[i]);
+	public TypeId this[int i] => new TypeId(Ids[i]);
 
 	public ArchetypeSignature()
 	{
@@ -24,7 +24,7 @@ internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
 	}
 
 	// Maintains sorted order
-	public void Insert(Id componentId)
+	public void Insert(TypeId componentId)
 	{
 		var index = Ids.BinarySearch(componentId.Value);
 
@@ -34,7 +34,7 @@ internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
 		}
 	}
 
-	public void Remove(Id componentId)
+	public void Remove(TypeId componentId)
 	{
 		var index = Ids.BinarySearch(componentId.Value);
 

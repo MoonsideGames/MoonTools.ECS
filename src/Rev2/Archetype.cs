@@ -8,11 +8,11 @@ internal class Archetype
 	public World World;
 	public ArchetypeSignature Signature;
 	public NativeArray[] ComponentColumns;
-	public NativeArray<Id> RowToEntity = new NativeArray<Id>();
+	public NativeArray<EntityId> RowToEntity = new NativeArray<EntityId>();
 
-	public Dictionary<Id, int> ComponentToColumnIndex =
-		new Dictionary<Id, int>();
-	public SortedDictionary<Id, ArchetypeEdge> Edges = new SortedDictionary<Id, ArchetypeEdge>();
+	public Dictionary<TypeId, int> ComponentToColumnIndex =
+		new Dictionary<TypeId, int>();
+	public SortedDictionary<TypeId, ArchetypeEdge> Edges = new SortedDictionary<TypeId, ArchetypeEdge>();
 
 	public int Count => RowToEntity.Count;
 

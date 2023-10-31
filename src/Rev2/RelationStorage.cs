@@ -10,25 +10,25 @@ internal class RelationStorage
 {
 	internal NativeArray relations;
 	internal NativeArray relationDatas;
-	internal Dictionary<(Id, Id), int> indices = new Dictionary<(Id, Id), int>(16);
-	internal Dictionary<Id, IndexableSet<Id>> outRelations = new Dictionary<Id, IndexableSet<Id>>(16);
-	internal Dictionary<Id, IndexableSet<Id>> inRelations = new Dictionary<Id, IndexableSet<Id>>(16);
-	private Stack<IndexableSet<Id>> listPool = new Stack<IndexableSet<Id>>();
+	internal Dictionary<(EntityId, EntityId), int> indices = new Dictionary<(EntityId, EntityId), int>(16);
+	internal Dictionary<EntityId, IndexableSet<EntityId>> outRelations = new Dictionary<EntityId, IndexableSet<EntityId>>(16);
+	internal Dictionary<EntityId, IndexableSet<EntityId>> inRelations = new Dictionary<EntityId, IndexableSet<EntityId>>(16);
+	private Stack<IndexableSet<EntityId>> listPool = new Stack<IndexableSet<EntityId>>();
 
 	private bool disposed;
 
 	public RelationStorage(int relationDataSize)
 	{
-		relations = new NativeArray(Unsafe.SizeOf<(Id, Id)>());
+		relations = new NativeArray(Unsafe.SizeOf<(EntityId, EntityId)>());
 		relationDatas = new NativeArray(relationDataSize);
 	}
 
-	public ReverseSpanEnumerator<(Id, Id)> All()
+	public ReverseSpanEnumerator<(EntityId, EntityId)> All()
 	{
-		return new ReverseSpanEnumerator<(Id, Id)>(relations.ToSpan<(Id, Id)>());
+		return new ReverseSpanEnumerator<(EntityId, EntityId)>(relations.ToSpan<(EntityId, EntityId)>());
 	}
 
-	public unsafe void Set<T>(in Id entityA, in Id entityB, in T relationData) where T : unmanaged
+	public unsafe void Set<T>(in EntityId entityA, in EntityId entityB, in T relationData) where T : unmanaged
 	{
 		var relation = (entityA, entityB);
 
@@ -55,18 +55,18 @@ internal class RelationStorage
 		indices.Add(relation, relations.Count - 1);
 	}
 
-	public ref T Get<T>(in Id entityA, in Id entityB) where T : unmanaged
+	public ref T Get<T>(in EntityId entityA, in EntityId entityB) where T : unmanaged
 	{
 		var relationIndex = indices[(entityA, entityB)];
 		return ref relationDatas.Get<T>(relationIndex);
 	}
 
-	public bool Has(Id entityA, Id entityB)
+	public bool Has(EntityId entityA, EntityId entityB)
 	{
 		return indices.ContainsKey((entityA, entityB));
 	}
 
-	public ReverseSpanEnumerator<Id> OutRelations(Id entityID)
+	public ReverseSpanEnumerator<EntityId> OutRelations(EntityId entityID)
 	{
 		if (outRelations.TryGetValue(entityID, out var entityOutRelations))
 		{
@@ -74,16 +74,16 @@ internal class RelationStorage
 		}
 		else
 		{
-			return ReverseSpanEnumerator<Id>.Empty;
+			return ReverseSpanEnumerator<EntityId>.Empty;
 		}
 	}
 
-	public Id OutFirst(Id entityID)
+	public EntityId OutFirst(EntityId entityID)
 	{
 		return OutNth(entityID, 0);
 	}
 
-	public Id OutNth(Id entityID, int n)
+	public EntityId OutNth(EntityId entityID, int n)
 	{
 #if DEBUG
 		if (!outRelations.ContainsKey(entityID) || outRelations[entityID].Count == 0)
@@ -94,17 +94,17 @@ internal class RelationStorage
 		return outRelations[entityID][n];
 	}
 
-	public bool HasOutRelation(Id entityID)
+	public bool HasOutRelation(EntityId entityID)
 	{
 		return outRelations.ContainsKey(entityID) && outRelations[entityID].Count > 0;
 	}
 
-	public int OutRelationCount(Id entityID)
+	public int OutRelationCount(EntityId entityID)
 	{
 		return outRelations.TryGetValue(entityID, out var entityOutRelations) ? entityOutRelations.Count : 0;
 	}
 
-	public ReverseSpanEnumerator<Id> InRelations(Id entityID)
+	public ReverseSpanEnumerator<EntityId> InRelations(EntityId entityID)
 	{
 		if (inRelations.TryGetValue(entityID, out var entityInRelations))
 		{
@@ -112,16 +112,16 @@ internal class RelationStorage
 		}
 		else
 		{
-			return ReverseSpanEnumerator<Id>.Empty;
+			return ReverseSpanEnumerator<EntityId>.Empty;
 		}
 	}
 
-	public Id InFirst(Id entityID)
+	public EntityId InFirst(EntityId entityID)
 	{
 		return InNth(entityID, 0);
 	}
 
-	public Id InNth(Id entityID, int n)
+	public EntityId InNth(EntityId entityID, int n)
 	{
 #if DEBUG
 		if (!inRelations.ContainsKey(entityID) || inRelations[entityID].Count == 0)
@@ -133,17 +133,17 @@ internal class RelationStorage
 		return inRelations[entityID][n];
 	}
 
-	public bool HasInRelation(Id entityID)
+	public bool HasInRelation(EntityId entityID)
 	{
 		return inRelations.ContainsKey(entityID) && inRelations[entityID].Count > 0;
 	}
 
-	public int InRelationCount(Id entityID)
+	public int InRelationCount(EntityId entityID)
 	{
 		return inRelations.TryGetValue(entityID, out var entityInRelations) ? entityInRelations.Count : 0;
 	}
 
-	public (bool, bool) Remove(in Id entityA, in Id entityB)
+	public (bool, bool) Remove(in EntityId entityA, in EntityId entityB)
 	{
 		var aEmpty = false;
 		var bEmpty = false;
@@ -177,7 +177,7 @@ internal class RelationStorage
 			// move an element into the hole
 			if (index != lastElementIndex)
 			{
-				var lastRelation = relations.Get<(Id, Id)>(lastElementIndex);
+				var lastRelation = relations.Get<(EntityId, EntityId)>(lastElementIndex);
 				indices[lastRelation] = index;
 			}
 
@@ -187,7 +187,7 @@ internal class RelationStorage
 		return (aEmpty, bEmpty);
 	}
 
-	public void RemoveEntity(in Id entity)
+	public void RemoveEntity(in EntityId entity)
 	{
 		if (outRelations.TryGetValue(entity, out var entityOutRelations))
 		{
@@ -212,17 +212,17 @@ internal class RelationStorage
 		}
 	}
 
-	internal IndexableSet<Id> AcquireHashSetFromPool()
+	internal IndexableSet<EntityId> AcquireHashSetFromPool()
 	{
 		if (listPool.Count == 0)
 		{
-			listPool.Push(new IndexableSet<Id>());
+			listPool.Push(new IndexableSet<EntityId>());
 		}
 
 		return listPool.Pop();
 	}
 
-	private void ReturnHashSetToPool(IndexableSet<Id> hashSet)
+	private void ReturnHashSetToPool(IndexableSet<EntityId> hashSet)
 	{
 		hashSet.Clear();
 		listPool.Push(hashSet);

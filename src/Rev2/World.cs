@@ -7,35 +7,35 @@ namespace MoonTools.ECS.Rev2;
 
 public class World : IDisposable
 {
-	// Get ComponentId from a Type
-	internal static Dictionary<Type, Id> TypeToId = new Dictionary<Type, Id>();
-	// Get element size from a ComponentId
-	internal static Dictionary<Id, int> ElementSizes = new Dictionary<Id, int>();
+	// Get TypeId from a Type
+	internal static Dictionary<Type, TypeId> TypeToId = new Dictionary<Type, TypeId>();
+	// Get element size from a TypeId
+	internal static Dictionary<TypeId, int> ElementSizes = new Dictionary<TypeId, int>();
 
 	// Lookup from ArchetypeSignature to Archetype
 	internal Dictionary<ArchetypeSignature, Archetype> ArchetypeIndex = new Dictionary<ArchetypeSignature, Archetype>();
 
 	// Going from EntityId to Archetype and storage row
-	internal Dictionary<Id, Record> EntityIndex = new Dictionary<Id, Record>();
+	internal Dictionary<EntityId, Record> EntityIndex = new Dictionary<EntityId, Record>();
 
 	// Relation Storages
-	internal Dictionary<Id, RelationStorage> RelationIndex =
-		new Dictionary<Id, RelationStorage>();
+	internal Dictionary<TypeId, RelationStorage> RelationIndex =
+		new Dictionary<TypeId, RelationStorage>();
 
 	// Entity Relation Tracking
-	internal Dictionary<Id, IndexableSet<Id>> EntityRelationIndex =
-		new Dictionary<Id, IndexableSet<Id>>();
+	internal Dictionary<EntityId, IndexableSet<TypeId>> EntityRelationIndex =
+		new Dictionary<EntityId, IndexableSet<TypeId>>();
 
 	// Message Storages
-	private Dictionary<Id, MessageStorage> MessageIndex =
-		new Dictionary<Id, MessageStorage>();
+	private Dictionary<TypeId, MessageStorage> MessageIndex =
+		new Dictionary<TypeId, MessageStorage>();
 
 	// Filters with a single Include type for Singleton/Some implementation
-	private Dictionary<Id, Filter> SingleTypeFilters = new Dictionary<Id, Filter>();
+	private Dictionary<TypeId, Filter> SingleTypeFilters = new Dictionary<TypeId, Filter>();
 
 	// ID Management
-	// FIXME: Entity and Type Ids should be separated
-	internal IdAssigner IdAssigner = new IdAssigner();
+	internal IdAssigner EntityIdAssigner = new IdAssigner();
+	internal IdAssigner TypeIdAssigner = new IdAssigner();
 
 	internal readonly Archetype EmptyArchetype;
 
@@ -67,28 +67,28 @@ public class World : IDisposable
 		return archetype;
 	}
 
-	public Id CreateEntity(string tag = "")
+	public EntityId CreateEntity(string tag = "")
 	{
-		var entityId = IdAssigner.Assign();
+		var entityId = new EntityId(EntityIdAssigner.Assign());
 		EntityIndex.Add(entityId, new Record(EmptyArchetype, EmptyArchetype.Count));
 		EmptyArchetype.RowToEntity.Add(entityId);
 
 		if (!EntityRelationIndex.ContainsKey(entityId))
 		{
-			EntityRelationIndex.Add(entityId, new IndexableSet<Id>());
+			EntityRelationIndex.Add(entityId, new IndexableSet<TypeId>());
 		}
 
 		return entityId;
 	}
 
-	internal Id GetTypeId<T>() where T : unmanaged
+	internal TypeId GetTypeId<T>() where T : unmanaged
 	{
 		if (TypeToId.ContainsKey(typeof(T)))
 		{
 			return TypeToId[typeof(T)];
 		}
 
-		var typeId = IdAssigner.Assign();
+		var typeId = new TypeId(TypeIdAssigner.Assign());
 		TypeToId.Add(typeof(T), typeId);
 		ElementSizes.Add(typeId, Unsafe.SizeOf<T>());
 		return typeId;
@@ -104,12 +104,12 @@ public class World : IDisposable
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private Id GetComponentId<T>() where T : unmanaged
+	private TypeId GetComponentId<T>() where T : unmanaged
 	{
 		return TypeToId[typeof(T)];
 	}
 
-	private void RegisterRelationType(Id typeId)
+	private void RegisterRelationType(TypeId typeId)
 	{
 		RelationIndex.Add(typeId, new RelationStorage(ElementSizes[typeId]));
 	}
@@ -131,7 +131,7 @@ public class World : IDisposable
 
 	// Messages
 
-	private Id GetMessageTypeId<T>() where T : unmanaged
+	private TypeId GetMessageTypeId<T>() where T : unmanaged
 	{
 		var typeId = GetTypeId<T>();
 
@@ -176,7 +176,7 @@ public class World : IDisposable
 	}
 
 	// Components
-	public bool Has<T>(Id entityId) where T : unmanaged
+	public bool Has<T>(EntityId entityId) where T : unmanaged
 	{
 		var componentId = GetComponentId<T>();
 		var record = EntityIndex[entityId];
@@ -190,7 +190,7 @@ public class World : IDisposable
 	}
 
 	// will throw if non-existent
-	public unsafe ref T Get<T>(Id entityId) where T : unmanaged
+	public unsafe ref T Get<T>(EntityId entityId) where T : unmanaged
 	{
 		var componentId = GetComponentId<T>();
 
@@ -217,7 +217,7 @@ public class World : IDisposable
 		throw new InvalidOperationException("No component of this type exists!");
 	}
 
-	public Id GetSingletonEntity<T>() where T : unmanaged
+	public EntityId GetSingletonEntity<T>() where T : unmanaged
 	{
 		var componentId = GetComponentId<T>();
 
@@ -232,7 +232,7 @@ public class World : IDisposable
 		throw new InvalidOperationException("No entity with this component type exists!");
 	}
 
-	public unsafe void Set<T>(in Id entityId, in T component) where T : unmanaged
+	public unsafe void Set<T>(in EntityId entityId, in T component) where T : unmanaged
 	{
 		TryRegisterComponentId<T>();
 		var componentId = GetComponentId<T>();
@@ -251,7 +251,7 @@ public class World : IDisposable
 		}
 	}
 
-	private void Add<T>(Id entityId, in T component) where T : unmanaged
+	private void Add<T>(EntityId entityId, in T component) where T : unmanaged
 	{
 		Archetype? nextArchetype;
 
@@ -290,7 +290,7 @@ public class World : IDisposable
 		column.Append(component);
 	}
 
-	public void Remove<T>(Id entityId) where T : unmanaged
+	public void Remove<T>(EntityId entityId) where T : unmanaged
 	{
 		Archetype? nextArchetype;
 
@@ -322,7 +322,7 @@ public class World : IDisposable
 		MoveEntityToLowerArchetype(entityId, row, archetype, nextArchetype, componentId);
 	}
 
-	public void Relate<T>(in Id entityA, in Id entityB, in T relation) where T : unmanaged
+	public void Relate<T>(in EntityId entityA, in EntityId entityB, in T relation) where T : unmanaged
 	{
 		TryRegisterRelationType<T>();
 		var relationStorage = GetRelationStorage<T>();
@@ -331,83 +331,77 @@ public class World : IDisposable
 		EntityRelationIndex[entityB].Add(TypeToId[typeof(T)]);
 	}
 
-	public void Unrelate<T>(in Id entityA, in Id entityB) where T : unmanaged
+	public void Unrelate<T>(in EntityId entityA, in EntityId entityB) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		relationStorage.Remove(entityA, entityB);
 	}
 
-	public void UnrelateAll<T>(in Id entity) where T : unmanaged
+	public void UnrelateAll<T>(in EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		relationStorage.RemoveEntity(entity);
 	}
 
-	public bool Related<T>(in Id entityA, in Id entityB) where T : unmanaged
+	public bool Related<T>(in EntityId entityA, in EntityId entityB) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.Has(entityA, entityB);
 	}
 
-	public T GetRelationData<T>(in Id entityA, in Id entityB) where T : unmanaged
+	public T GetRelationData<T>(in EntityId entityA, in EntityId entityB) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.Get<T>(entityA, entityB);
 	}
 
-	public ReverseSpanEnumerator<(Id, Id)> Relations<T>() where T : unmanaged
+	public ReverseSpanEnumerator<(EntityId, EntityId)> Relations<T>() where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.All();
 	}
 
-	public ReverseSpanEnumerator<Id> OutRelations<T>(Id entity) where T : unmanaged
+	public ReverseSpanEnumerator<EntityId> OutRelations<T>(EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.OutRelations(entity);
 	}
 
-	public Id OutRelationSingleton<T>(in Id entity) where T : unmanaged
+	public EntityId OutRelationSingleton<T>(in EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.OutFirst(entity);
 	}
 
-	public bool HasOutRelation<T>(in Id entity) where T : unmanaged
+	public bool HasOutRelation<T>(in EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.HasOutRelation(entity);
 	}
 
-	public ReverseSpanEnumerator<Id> InRelations<T>(Id entity) where T : unmanaged
+	public ReverseSpanEnumerator<EntityId> InRelations<T>(EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.InRelations(entity);
 	}
 
-	public Id InRelationSingleton<T>(in Id entity) where T : unmanaged
+	public EntityId InRelationSingleton<T>(in EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.InFirst(entity);
 	}
 
-	public bool HasInRelation<T>(in Id entity) where T : unmanaged
+	public bool HasInRelation<T>(in EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.HasInRelation(entity);
 	}
 
-	private bool Has(Id entityId, Id typeId)
-	{
-		var record = EntityIndex[entityId];
-		return record.Archetype.ComponentToColumnIndex.ContainsKey(typeId);
-	}
-
 	// used as a fast path by Archetype.ClearAll and snapshot restore
-	internal void FreeEntity(Id entityId)
+	internal void FreeEntity(EntityId entityId)
 	{
 		EntityIndex.Remove(entityId);
-		IdAssigner.Unassign(entityId);
+		EntityIdAssigner.Unassign(entityId.Value);
 
 		foreach (var relationTypeIndex in EntityRelationIndex[entityId])
 		{
@@ -418,7 +412,7 @@ public class World : IDisposable
 		EntityRelationIndex[entityId].Clear();
 	}
 
-	public void Destroy(Id entityId)
+	public void Destroy(EntityId entityId)
 	{
 		var record = EntityIndex[entityId];
 		var archetype = record.Archetype;
@@ -439,7 +433,7 @@ public class World : IDisposable
 
 		archetype.RowToEntity.RemoveLastElement();
 		EntityIndex.Remove(entityId);
-		IdAssigner.Unassign(entityId);
+		EntityIdAssigner.Unassign(entityId.Value);
 
 		foreach (var relationTypeIndex in EntityRelationIndex[entityId])
 		{
@@ -450,7 +444,7 @@ public class World : IDisposable
 		EntityRelationIndex[entityId].Clear();
 	}
 
-	private void MoveEntityToHigherArchetype(Id entityId, int row, Archetype from, Archetype to)
+	private void MoveEntityToHigherArchetype(EntityId entityId, int row, Archetype from, Archetype to)
 	{
 		for (int i = 0; i < from.Signature.Count; i += 1)
 		{
@@ -479,7 +473,7 @@ public class World : IDisposable
 		to.RowToEntity.Add(entityId);
 	}
 
-	private void MoveEntityToLowerArchetype(Id entityId, int row, Archetype from, Archetype to, Id removed)
+	private void MoveEntityToLowerArchetype(EntityId entityId, int row, Archetype from, Archetype to, TypeId removed)
 	{
 		for (int i = 0; i < from.Signature.Count; i += 1)
 		{

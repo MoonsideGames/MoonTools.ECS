@@ -24,15 +24,13 @@ public ref struct FilterBuilder
 
 	public FilterBuilder Include<T>() where T : unmanaged
 	{
-		World.GetTypeId<T>();
-		Included.Add(World.TypeToId[typeof(T)]);
+		Included.Add(World.GetTypeId<T>());
 		return new FilterBuilder(World, Included, Excluded);
 	}
 
 	public FilterBuilder Exclude<T>() where T : unmanaged
 	{
-		World.GetTypeId<T>();
-		Excluded.Add(World.TypeToId[typeof(T)]);
+		Excluded.Add(World.GetTypeId<T>());
 		return new FilterBuilder(World, Included, Excluded);
 	}
 

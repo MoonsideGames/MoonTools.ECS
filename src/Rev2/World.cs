@@ -18,9 +18,6 @@ public class World : IDisposable
 	// Going from EntityId to Archetype and storage row
 	internal Dictionary<Id, Record> EntityIndex = new Dictionary<Id, Record>();
 
-	// Going from ComponentId to Archetype list
-	Dictionary<Id, List<Archetype>> ComponentIndex = new Dictionary<Id, List<Archetype>>();
-
 	// Relation Storages
 	internal Dictionary<Id, RelationStorage> RelationIndex =
 		new Dictionary<Id, RelationStorage>();
@@ -32,6 +29,9 @@ public class World : IDisposable
 	// Message Storages
 	private Dictionary<Id, MessageStorage> MessageIndex =
 		new Dictionary<Id, MessageStorage>();
+
+	// Filters with a single Include type for Singleton/Some implementation
+	private Dictionary<Id, Filter> SingleTypeFilters = new Dictionary<Id, Filter>();
 
 	// ID Management
 	// FIXME: Entity and Type Ids should be separated
@@ -60,7 +60,6 @@ public class World : IDisposable
 		for (int i = 0; i < signature.Count; i += 1)
 		{
 			var componentId = signature[i];
-			ComponentIndex[componentId].Add(archetype);
 			archetype.ComponentToColumnIndex.Add(componentId, i);
 			archetype.ComponentColumns[i] = new NativeArray(ElementSizes[componentId]);
 		}
@@ -68,7 +67,7 @@ public class World : IDisposable
 		return archetype;
 	}
 
-	public Id CreateEntity()
+	public Id CreateEntity(string tag = "")
 	{
 		var entityId = IdAssigner.Assign();
 		EntityIndex.Add(entityId, new Record(EmptyArchetype, EmptyArchetype.Count));
@@ -98,9 +97,9 @@ public class World : IDisposable
 	private void TryRegisterComponentId<T>() where T : unmanaged
 	{
 		var typeId = GetTypeId<T>();
-		if (!ComponentIndex.ContainsKey(typeId))
+		if (!SingleTypeFilters.ContainsKey(typeId))
 		{
-			ComponentIndex.Add(typeId, new List<Archetype>());
+			SingleTypeFilters.Add(typeId, FilterBuilder.Include<T>().Build());
 		}
 	}
 
@@ -184,6 +183,12 @@ public class World : IDisposable
 		return record.Archetype.ComponentToColumnIndex.ContainsKey(componentId);
 	}
 
+	public bool Some<T>() where T : unmanaged
+	{
+		var componentTypeId = GetComponentId<T>();
+		return SingleTypeFilters[componentTypeId].Count > 0;
+	}
+
 	// will throw if non-existent
 	public unsafe ref T Get<T>(Id entityId) where T : unmanaged
 	{
@@ -194,6 +199,37 @@ public class World : IDisposable
 		var column = record.Archetype.ComponentColumns[columnIndex];
 
 		return ref ((T*) column.Elements)[record.Row];
+	}
+
+	public ref T GetSingleton<T>() where T : unmanaged
+	{
+		var componentId = GetComponentId<T>();
+
+		foreach (var archetype in SingleTypeFilters[componentId].Archetypes)
+		{
+			if (archetype.Count > 0)
+			{
+				var columnIndex = archetype.ComponentToColumnIndex[componentId];
+				return ref archetype.ComponentColumns[columnIndex].Get<T>(0);
+			}
+		}
+
+		throw new InvalidOperationException("No component of this type exists!");
+	}
+
+	public Id GetSingletonEntity<T>() where T : unmanaged
+	{
+		var componentId = GetComponentId<T>();
+
+		foreach (var archetype in SingleTypeFilters[componentId].Archetypes)
+		{
+			if (archetype.Count > 0)
+			{
+				return archetype.RowToEntity[0];
+			}
+		}
+
+		throw new InvalidOperationException("No entity with this component type exists!");
 	}
 
 	public unsafe void Set<T>(in Id entityId, in T component) where T : unmanaged
@@ -301,6 +337,12 @@ public class World : IDisposable
 		relationStorage.Remove(entityA, entityB);
 	}
 
+	public void UnrelateAll<T>(in Id entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		relationStorage.RemoveEntity(entity);
+	}
+
 	public bool Related<T>(in Id entityA, in Id entityB) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
@@ -325,10 +367,34 @@ public class World : IDisposable
 		return relationStorage.OutRelations(entity);
 	}
 
+	public Id OutRelationSingleton<T>(in Id entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutFirst(entity);
+	}
+
+	public bool HasOutRelation<T>(in Id entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.HasOutRelation(entity);
+	}
+
 	public ReverseSpanEnumerator<Id> InRelations<T>(Id entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.InRelations(entity);
+	}
+
+	public Id InRelationSingleton<T>(in Id entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InFirst(entity);
+	}
+
+	public bool HasInRelation<T>(in Id entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.HasInRelation(entity);
 	}
 
 	private bool Has(Id entityId, Id typeId)

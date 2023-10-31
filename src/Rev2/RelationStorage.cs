@@ -187,7 +187,7 @@ internal class RelationStorage
 		return (aEmpty, bEmpty);
 	}
 
-	public void RemoveEntity(Id entity)
+	public void RemoveEntity(in Id entity)
 	{
 		if (outRelations.TryGetValue(entity, out var entityOutRelations))
 		{

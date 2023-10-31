@@ -4,6 +4,8 @@ namespace MoonTools.ECS.Rev2.Compatibility;
 
 public class System : Manipulator
 {
+	public FilterBuilder FilterBuilder => World.FilterBuilder;
+
 	public System(World world) : base(world) { }
 
 	protected ReadOnlySpan<T> ReadMessages<T>() where T : unmanaged => World.ReadMessages<T>();

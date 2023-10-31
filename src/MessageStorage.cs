@@ -63,7 +63,7 @@ namespace MoonTools.ECS
 			return messages[0];
 		}
 
-		public ReverseSpanEnumerator<TMessage> WithEntity(int entityID)
+		public Span<TMessage>.Enumerator WithEntity(int entityID)
 		{
 			if (entityToMessages.TryGetValue(entityID, out var messages))
 			{
@@ -71,7 +71,7 @@ namespace MoonTools.ECS
 			}
 			else
 			{
-				return ReverseSpanEnumerator<TMessage>.Empty;
+				return Span<TMessage>.Empty.GetEnumerator();
 			}
 		}
 

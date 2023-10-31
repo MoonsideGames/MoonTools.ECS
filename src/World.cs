@@ -36,6 +36,11 @@ namespace MoonTools.ECS
 			return EntityStorage.Tag(entity);
 		}
 
+		public ref TComponent Get<TComponent>(in Entity entity) where TComponent : unmanaged
+		{
+			return ref ComponentDepot.Get<TComponent>(entity.ID);
+		}
+
 		public void Set<TComponent>(Entity entity, in TComponent component) where TComponent : unmanaged
 		{
 #if DEBUG

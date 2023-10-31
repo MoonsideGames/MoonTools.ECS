@@ -1,92 +1,91 @@
 using System;
 using System.Collections.Generic;
 
-namespace MoonTools.ECS.Rev2
+namespace MoonTools.ECS.Rev2;
+
+internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
 {
-	internal class ArchetypeSignature : IEquatable<ArchetypeSignature>
+	public static ArchetypeSignature Empty = new ArchetypeSignature(0);
+
+	List<uint> Ids;
+
+	public int Count => Ids.Count;
+
+	public Id this[int i] => new Id(Ids[i]);
+
+	public ArchetypeSignature()
 	{
-		public static ArchetypeSignature Empty = new ArchetypeSignature(0);
+		Ids = new List<uint>();
+	}
 
-		List<uint> Ids;
+	public ArchetypeSignature(int capacity)
+	{
+		Ids = new List<uint>(capacity);
+	}
 
-		public int Count => Ids.Count;
+	// Maintains sorted order
+	public void Insert(Id componentId)
+	{
+		var index = Ids.BinarySearch(componentId.Value);
 
-		public Id this[int i] => new Id(Ids[i]);
-
-		public ArchetypeSignature()
+		if (index < 0)
 		{
-			Ids = new List<uint>();
+			Ids.Insert(~index, componentId.Value);
+		}
+	}
+
+	public void Remove(Id componentId)
+	{
+		var index = Ids.BinarySearch(componentId.Value);
+
+		if (index >= 0)
+		{
+			Ids.RemoveAt(index);
+		}
+	}
+
+	public void CopyTo(ArchetypeSignature other)
+	{
+		other.Ids.AddRange(Ids);
+	}
+
+	public override bool Equals(object? obj)
+	{
+		return obj is ArchetypeSignature signature && Equals(signature);
+	}
+
+	public bool Equals(ArchetypeSignature? other)
+	{
+		if (other == null)
+		{
+			return false;
 		}
 
-		public ArchetypeSignature(int capacity)
+		if (Ids.Count != other.Ids.Count)
 		{
-			Ids = new List<uint>(capacity);
+			return false;
 		}
 
-		// Maintains sorted order
-		public void Insert(Id componentId)
+		for (int i = 0; i < Ids.Count; i += 1)
 		{
-			var index = Ids.BinarySearch(componentId.Value);
-
-			if (index < 0)
-			{
-				Ids.Insert(~index, componentId.Value);
-			}
-		}
-
-		public void Remove(Id componentId)
-		{
-			var index = Ids.BinarySearch(componentId.Value);
-
-			if (index >= 0)
-			{
-				Ids.RemoveAt(index);
-			}
-		}
-
-		public void CopyTo(ArchetypeSignature other)
-		{
-			other.Ids.AddRange(Ids);
-		}
-
-		public override bool Equals(object? obj)
-		{
-			return obj is ArchetypeSignature signature && Equals(signature);
-		}
-
-		public bool Equals(ArchetypeSignature? other)
-		{
-			if (other == null)
-			{
-				return false;
-			}
-
-			if (Ids.Count != other.Ids.Count)
+			if (Ids[i] != other.Ids[i])
 			{
 				return false;
 			}
-
-			for (int i = 0; i < Ids.Count; i += 1)
-			{
-				if (Ids[i] != other.Ids[i])
-				{
-					return false;
-				}
-			}
-
-			return true;
 		}
 
-		public override int GetHashCode()
+		return true;
+	}
+
+	public override int GetHashCode()
+	{
+		var hashcode = 1;
+
+		foreach (var id in Ids)
 		{
-			var hashcode = 1;
-
-			foreach (var id in Ids)
-			{
-				hashcode = HashCode.Combine(hashcode, id);
-			}
-
-			return hashcode;
+			hashcode = HashCode.Combine(hashcode, id);
 		}
+
+		return hashcode;
 	}
 }

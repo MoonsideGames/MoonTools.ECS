@@ -41,7 +41,7 @@ namespace MoonTools.ECS
 			return count > 0;
 		}
 
-		public ref readonly TComponent Get(int entityID)
+		public ref TComponent Get(int entityID)
 		{
 			return ref components[entityIDToStorageIndex[entityID]];
 		}
@@ -151,6 +151,7 @@ namespace MoonTools.ECS
 		{
 			return entityIDToStorageIndex.Keys;
 		}
+#endif
 
 		protected virtual void Dispose(bool disposing)
 		{
@@ -177,6 +178,5 @@ namespace MoonTools.ECS
 			Dispose(disposing: true);
 			GC.SuppressFinalize(this);
 		}
-#endif
 	}
 }

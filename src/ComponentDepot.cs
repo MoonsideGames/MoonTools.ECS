@@ -43,7 +43,7 @@ namespace MoonTools.ECS
 			return Lookup<TComponent>().Any();
 		}
 
-		public ref readonly TComponent Get<TComponent>(int entityID) where TComponent : unmanaged
+		public ref TComponent Get<TComponent>(int entityID) where TComponent : unmanaged
 		{
 			return ref Lookup<TComponent>().Get(entityID);
 		}

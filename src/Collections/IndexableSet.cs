@@ -60,12 +60,27 @@ namespace MoonTools.ECS.Collections
 				return false;
 			}
 
+			/*
 			var lastElement = array[Count - 1];
 			var index = indices[element];
 			array[index] = lastElement;
 			indices[lastElement] = index;
 			count -= 1;
 			indices.Remove(element);
+			*/
+
+			// FIXME: we can probably undo this change
+
+			var index = indices[element];
+
+			for (var i = index; i < Count - 1; i += 1)
+			{
+				array[i] = array[i + 1];
+				indices[array[i]] = i;
+			}
+
+			indices.Remove(element);
+			count -= 1;
 
 			return true;
 		}

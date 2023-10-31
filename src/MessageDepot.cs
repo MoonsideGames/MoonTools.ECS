@@ -42,7 +42,7 @@ namespace MoonTools.ECS
 			return Lookup<TMessage>().First();
 		}
 
-		public ReverseSpanEnumerator<TMessage> WithEntity<TMessage>(int entityID) where TMessage : unmanaged
+		public Span<TMessage>.Enumerator WithEntity<TMessage>(int entityID) where TMessage : unmanaged
 		{
 			return Lookup<TMessage>().WithEntity(entityID);
 		}

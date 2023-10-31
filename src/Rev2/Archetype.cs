@@ -7,7 +7,7 @@ internal class Archetype
 {
 	public World World;
 	public ArchetypeSignature Signature;
-	public Column[] ComponentColumns;
+	public NativeArray[] ComponentColumns;
 	public NativeArray<Id> RowToEntity = new NativeArray<Id>();
 
 	public Dictionary<Id, int> ComponentToColumnIndex =
@@ -20,7 +20,7 @@ internal class Archetype
 	{
 		World = world;
 		Signature = signature;
-		ComponentColumns = new Column[signature.Count];
+		ComponentColumns = new NativeArray[signature.Count];
 	}
 
 	public void ClearAll()

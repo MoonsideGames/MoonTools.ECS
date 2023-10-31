@@ -139,20 +139,20 @@ public class Snapshot
 
 	private class ArchetypeSnapshot
 	{
-		private readonly Column[] ComponentColumns;
+		private readonly NativeArray[] ComponentColumns;
 		private readonly NativeArray<Id> RowToEntity;
 
 		public int Count => RowToEntity.Count;
 
 		public ArchetypeSnapshot(ArchetypeSignature signature)
 		{
-			ComponentColumns = new Column[signature.Count];
+			ComponentColumns = new NativeArray[signature.Count];
 			RowToEntity = new NativeArray<Id>();
 
 			for (int i = 0; i < signature.Count; i += 1)
 			{
 				var componentId = signature[i];
-				ComponentColumns[i] = new Column(World.ElementSizes[componentId]);
+				ComponentColumns[i] = new NativeArray(World.ElementSizes[componentId]);
 			}
 		}
 
@@ -180,13 +180,13 @@ public class Snapshot
 
 	private class RelationSnapshot
 	{
-		private Column Relations;
-		private Column RelationDatas;
+		private NativeArray Relations;
+		private NativeArray RelationDatas;
 
 		public RelationSnapshot(int elementSize)
 		{
-			Relations = new Column(Unsafe.SizeOf<(Id, Id)>());
-			RelationDatas = new Column(elementSize);
+			Relations = new NativeArray(Unsafe.SizeOf<(Id, Id)>());
+			RelationDatas = new NativeArray(elementSize);
 		}
 
 		public void Take(RelationStorage relationStorage)

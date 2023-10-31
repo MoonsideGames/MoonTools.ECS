@@ -8,8 +8,8 @@ namespace MoonTools.ECS.Rev2;
 // TODO: implement this entire class with NativeMemory equivalents, can just memcpy for snapshots
 internal class RelationStorage
 {
-	internal Column relations;
-	internal Column relationDatas;
+	internal NativeArray relations;
+	internal NativeArray relationDatas;
 	internal Dictionary<(Id, Id), int> indices = new Dictionary<(Id, Id), int>(16);
 	internal Dictionary<Id, IndexableSet<Id>> outRelations = new Dictionary<Id, IndexableSet<Id>>(16);
 	internal Dictionary<Id, IndexableSet<Id>> inRelations = new Dictionary<Id, IndexableSet<Id>>(16);
@@ -19,8 +19,8 @@ internal class RelationStorage
 
 	public RelationStorage(int relationDataSize)
 	{
-		relations = new Column(Unsafe.SizeOf<(Id, Id)>());
-		relationDatas = new Column(relationDataSize);
+		relations = new NativeArray(Unsafe.SizeOf<(Id, Id)>());
+		relationDatas = new NativeArray(relationDataSize);
 	}
 
 	public ReverseSpanEnumerator<(Id, Id)> All()

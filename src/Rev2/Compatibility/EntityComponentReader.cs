@@ -3,6 +3,7 @@
 public abstract class EntityComponentReader
 {
 	protected World World;
+	public FilterBuilder FilterBuilder => World.FilterBuilder;
 
 	protected EntityComponentReader(World world)
 	{

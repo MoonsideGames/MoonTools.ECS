@@ -34,6 +34,11 @@ internal unsafe class NativeArray : IDisposable
 		return ref ((T*) Elements)[i];
 	}
 
+	public void* Get(int i)
+	{
+		return (void*)(Elements + ElementSize * i);
+	}
+
 	private void Resize()
 	{
 		Capacity *= 2;

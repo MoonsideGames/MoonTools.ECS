@@ -4,8 +4,6 @@ namespace MoonTools.ECS.Rev2.Compatibility;
 
 public abstract class System : Manipulator
 {
-	public FilterBuilder FilterBuilder => World.FilterBuilder;
-
 	protected System(World world) : base(world) { }
 
 	public abstract void Update();

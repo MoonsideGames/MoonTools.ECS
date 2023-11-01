@@ -3,14 +3,23 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using MoonTools.ECS.Collections;
 
+#if DEBUG
+using System.Reflection;
+#endif
+
 namespace MoonTools.ECS.Rev2;
 
 public class World : IDisposable
 {
 	// Get TypeId from a Type
-	internal static Dictionary<Type, TypeId> TypeToId = new Dictionary<Type, TypeId>();
+	internal Dictionary<Type, TypeId> TypeToId = new Dictionary<Type, TypeId>();
+
+	#if DEBUG
+	private Dictionary<TypeId, Type> IdToType = new Dictionary<TypeId, Type>();
+	#endif
+
 	// Get element size from a TypeId
-	internal static Dictionary<TypeId, int> ElementSizes = new Dictionary<TypeId, int>();
+	private Dictionary<TypeId, int> ElementSizes = new Dictionary<TypeId, int>();
 
 	// Lookup from ArchetypeSignature to Archetype
 	internal Dictionary<ArchetypeSignature, Archetype> ArchetypeIndex = new Dictionary<ArchetypeSignature, Archetype>();
@@ -31,11 +40,11 @@ public class World : IDisposable
 		new Dictionary<TypeId, MessageStorage>();
 
 	// Filters with a single Include type for Singleton/Some implementation
-	private Dictionary<TypeId, Filter> SingleTypeFilters = new Dictionary<TypeId, Filter>();
+	internal Dictionary<TypeId, Filter> SingleTypeFilters = new Dictionary<TypeId, Filter>();
 
-	// ID Management
+	// Entity ID Management
 	internal IdAssigner EntityIdAssigner = new IdAssigner();
-	internal IdAssigner TypeIdAssigner = new IdAssigner();
+	private IdAssigner TypeIdAssigner = new IdAssigner();
 
 	internal readonly Archetype EmptyArchetype;
 
@@ -91,6 +100,10 @@ public class World : IDisposable
 		var typeId = new TypeId(TypeIdAssigner.Assign());
 		TypeToId.Add(typeof(T), typeId);
 		ElementSizes.Add(typeId, Unsafe.SizeOf<T>());
+
+		#if DEBUG
+		IdToType.Add(typeId, typeof(T));
+		#endif
 		return typeId;
 	}
 
@@ -543,6 +556,67 @@ public class World : IDisposable
 			}
 		}
 	}
+
+	// DEBUG
+	// NOTE: these methods are very inefficient
+	// they should only be used in debugging contexts!!
+	#if DEBUG
+	public ComponentEnumerator Debug_GetAllComponents(EntityId entity)
+	{
+		return new ComponentEnumerator(this, EntityIndex[entity]);
+	}
+
+	public Filter.EntityEnumerator Debug_GetEntities(Type componentType)
+	{
+		var typeId = TypeToId[componentType];
+		return SingleTypeFilters[typeId].Entities;
+	}
+
+	public IEnumerable<Type> Debug_SearchComponentType(string typeString)
+	{
+		foreach (var type in TypeToId.Keys)
+		{
+			if (type.ToString().ToLower().Contains(typeString.ToLower()))
+			{
+				yield return type;
+			}
+		}
+	}
+
+	public ref struct ComponentEnumerator
+	{
+		private World World;
+		private Record Record;
+		private int ComponentIndex;
+
+		public ComponentEnumerator GetEnumerator() => this;
+
+		internal ComponentEnumerator(
+			World world,
+			Record record
+		)
+		{
+			World = world;
+			Record = record;
+			ComponentIndex = -1;
+		}
+
+		public bool MoveNext()
+		{
+			ComponentIndex += 1;
+			return ComponentIndex < Record.Archetype.ComponentColumns.Length;
+		}
+
+		public unsafe object Current
+		{
+			get
+			{
+				var elt = Record.Archetype.ComponentColumns[ComponentIndex].Get(Record.Row);
+				return Pointer.Box(elt, World.IdToType[Record.Archetype.Signature[ComponentIndex]]);
+			}
+		}
+	}
+	#endif
 
 	protected virtual void Dispose(bool disposing)
 	{

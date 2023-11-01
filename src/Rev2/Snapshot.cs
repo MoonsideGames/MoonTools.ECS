@@ -119,7 +119,7 @@ public class Snapshot
 	{
 		if (!ArchetypeSnapshots.TryGetValue(archetype.Signature, out var archetypeSnapshot))
 		{
-			archetypeSnapshot = new ArchetypeSnapshot(archetype.Signature);
+			archetypeSnapshot = new ArchetypeSnapshot(archetype);
 			ArchetypeSnapshots.Add(archetype.Signature, archetypeSnapshot);
 		}
 
@@ -130,7 +130,7 @@ public class Snapshot
 	{
 		if (!RelationSnapshots.TryGetValue(typeId, out var snapshot))
 		{
-			snapshot = new RelationSnapshot(World.ElementSizes[typeId]);
+			snapshot = new RelationSnapshot(relationStorage.relationDatas.ElementSize);
 			RelationSnapshots.Add(typeId, snapshot);
 		}
 
@@ -144,15 +144,14 @@ public class Snapshot
 
 		public int Count => RowToEntity.Count;
 
-		public ArchetypeSnapshot(ArchetypeSignature signature)
+		public ArchetypeSnapshot(Archetype archetype)
 		{
-			ComponentColumns = new NativeArray[signature.Count];
+			ComponentColumns = new NativeArray[archetype.ComponentColumns.Length];
 			RowToEntity = new NativeArray<EntityId>();
 
-			for (int i = 0; i < signature.Count; i += 1)
+			for (int i = 0; i < archetype.ComponentColumns.Length; i += 1)
 			{
-				var componentId = signature[i];
-				ComponentColumns[i] = new NativeArray(World.ElementSizes[componentId]);
+				ComponentColumns[i] = new NativeArray(archetype.ComponentColumns[i].ElementSize);
 			}
 		}
 

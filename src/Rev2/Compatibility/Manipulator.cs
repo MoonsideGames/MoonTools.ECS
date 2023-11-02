@@ -5,6 +5,7 @@ public class Manipulator : EntityComponentReader
 	public Manipulator(World world) : base(world) { }
 
 	protected EntityId CreateEntity(string tag = "") => World.CreateEntity(tag);
+	protected void Tag(in EntityId entity, string tag) => World.Tag(entity, tag);
 	protected void Set<TComponent>(in EntityId entity, in TComponent component) where TComponent : unmanaged => World.Set<TComponent>(entity, component);
 	protected void Remove<TComponent>(in EntityId entity) where TComponent : unmanaged => World.Remove<TComponent>(entity);
 

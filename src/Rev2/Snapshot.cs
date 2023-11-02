@@ -4,6 +4,7 @@ using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS.Rev2;
 
+// TODO: we should implement a NativeDictionary that can be memcopied
 public class Snapshot
 {
 	private Dictionary<ArchetypeSignature, ArchetypeSnapshot> ArchetypeSnapshots =
@@ -16,6 +17,8 @@ public class Snapshot
 
 	private Dictionary<EntityId, IndexableSet<TypeId>> EntityRelationIndex =
 		new Dictionary<EntityId, IndexableSet<TypeId>>();
+
+	private Dictionary<EntityId, string> EntityTags = new Dictionary<EntityId, string>();
 
 	private IdAssigner EntityIdAssigner = new IdAssigner();
 
@@ -71,6 +74,11 @@ public class Snapshot
 				world.EntityRelationIndex[id].Add(typeId);
 			}
 		}
+
+		foreach (var (id, s) in EntityTags)
+		{
+			world.EntityTags[id] = s;
+		}
 	}
 
 	public void Take(World world)
@@ -112,6 +120,11 @@ public class Snapshot
 			{
 				EntityRelationIndex[id].Add(typeId);
 			}
+		}
+
+		foreach (var (id, s) in world.EntityTags)
+		{
+			EntityTags[id] = s;
 		}
 	}
 

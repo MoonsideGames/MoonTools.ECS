@@ -27,6 +27,9 @@ public class World : IDisposable
 	// Going from EntityId to Archetype and storage row
 	internal Dictionary<EntityId, Record> EntityIndex = new Dictionary<EntityId, Record>();
 
+	// TODO: can we make the tag an inline array of chars at some point?
+	internal Dictionary<EntityId, string> EntityTags = new Dictionary<EntityId, string>();
+
 	// Relation Storages
 	internal Dictionary<TypeId, RelationStorage> RelationIndex =
 		new Dictionary<TypeId, RelationStorage>();
@@ -87,7 +90,19 @@ public class World : IDisposable
 			EntityRelationIndex.Add(entityId, new IndexableSet<TypeId>());
 		}
 
+		EntityTags[entityId] = tag;
+
 		return entityId;
+	}
+
+	public void Tag(in EntityId entityId, string tag)
+	{
+		EntityTags[entityId] = tag;
+	}
+
+	public string GetTag(in EntityId entityId)
+	{
+		return EntityTags[entityId];
 	}
 
 	internal TypeId GetTypeId<T>() where T : unmanaged

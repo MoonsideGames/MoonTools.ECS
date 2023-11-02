@@ -2,13 +2,15 @@
 
 public abstract class EntityComponentReader
 {
-	protected World World;
+	protected readonly World World;
 	public FilterBuilder FilterBuilder => World.FilterBuilder;
 
 	protected EntityComponentReader(World world)
 	{
 		World = world;
 	}
+
+	protected string GetTag(in EntityId entity) => World.GetTag(entity);
 
 	protected bool Has<T>(in EntityId entityId) where T : unmanaged => World.Has<T>(entityId);
 	protected bool Some<T>() where T : unmanaged => World.Some<T>();

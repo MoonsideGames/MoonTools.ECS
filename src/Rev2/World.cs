@@ -3,10 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using MoonTools.ECS.Collections;
 
-#if DEBUG
-using System.Reflection;
-#endif
-
 namespace MoonTools.ECS.Rev2;
 
 public class World : IDisposable
@@ -122,39 +118,35 @@ public class World : IDisposable
 		return typeId;
 	}
 
-	private void TryRegisterComponentId<T>() where T : unmanaged
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private TypeId GetComponentId<T>() where T : unmanaged
 	{
 		var typeId = GetTypeId<T>();
 		if (!SingleTypeFilters.ContainsKey(typeId))
 		{
 			SingleTypeFilters.Add(typeId, FilterBuilder.Include<T>().Build());
 		}
+
+		return typeId;
 	}
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private TypeId GetComponentId<T>() where T : unmanaged
+	private RelationStorage RegisterRelationType(TypeId typeId)
 	{
-		return TypeToId[typeof(T)];
-	}
-
-	private void RegisterRelationType(TypeId typeId)
-	{
-		RelationIndex.Add(typeId, new RelationStorage(ElementSizes[typeId]));
-	}
-
-	private void TryRegisterRelationType<T>() where T : unmanaged
-	{
-		var typeId = GetTypeId<T>();
-		if (!RelationIndex.ContainsKey(typeId))
-		{
-			RegisterRelationType(typeId);
-		}
+		var relationStorage = new RelationStorage(ElementSizes[typeId]);
+		RelationIndex.Add(typeId, relationStorage);
+		return relationStorage;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private RelationStorage GetRelationStorage<T>() where T : unmanaged
 	{
-		return RelationIndex[TypeToId[typeof(T)]];
+		var typeId = GetTypeId<T>();
+		if (RelationIndex.TryGetValue(typeId, out var relationStorage))
+		{
+			return relationStorage;
+		}
+
+		return RegisterRelationType(typeId);
 	}
 
 	// Messages
@@ -262,7 +254,6 @@ public class World : IDisposable
 
 	public unsafe void Set<T>(in EntityId entityId, in T component) where T : unmanaged
 	{
-		TryRegisterComponentId<T>();
 		var componentId = GetComponentId<T>();
 
 		if (Has<T>(entityId))
@@ -322,6 +313,11 @@ public class World : IDisposable
 	{
 		Archetype? nextArchetype;
 
+		if (!Has<T>(entityId))
+		{
+			return;
+		}
+
 		var componentId = GetComponentId<T>();
 
 		var (archetype, row) = EntityIndex[entityId];
@@ -352,7 +348,6 @@ public class World : IDisposable
 
 	public void Relate<T>(in EntityId entityA, in EntityId entityB, in T relation) where T : unmanaged
 	{
-		TryRegisterRelationType<T>();
 		var relationStorage = GetRelationStorage<T>();
 		relationStorage.Set(entityA, entityB, relation);
 		EntityRelationIndex[entityA].Add(TypeToId[typeof(T)]);
@@ -600,9 +595,9 @@ public class World : IDisposable
 	// NOTE: these methods are very inefficient
 	// they should only be used in debugging contexts!!
 	#if DEBUG
-	public ComponentEnumerator Debug_GetAllComponents(EntityId entity)
+	public ComponentTypeEnumerator Debug_GetAllComponentTypes(EntityId entity)
 	{
-		return new ComponentEnumerator(this, EntityIndex[entity]);
+		return new ComponentTypeEnumerator(this, EntityIndex[entity]);
 	}
 
 	public Filter.EntityEnumerator Debug_GetEntities(Type componentType)
@@ -622,15 +617,15 @@ public class World : IDisposable
 		}
 	}
 
-	public ref struct ComponentEnumerator
+	public ref struct ComponentTypeEnumerator
 	{
 		private World World;
 		private Record Record;
 		private int ComponentIndex;
 
-		public ComponentEnumerator GetEnumerator() => this;
+		public ComponentTypeEnumerator GetEnumerator() => this;
 
-		internal ComponentEnumerator(
+		internal ComponentTypeEnumerator(
 			World world,
 			Record record
 		)
@@ -646,14 +641,7 @@ public class World : IDisposable
 			return ComponentIndex < Record.Archetype.ComponentColumns.Length;
 		}
 
-		public unsafe object Current
-		{
-			get
-			{
-				var elt = Record.Archetype.ComponentColumns[ComponentIndex].Get(Record.Row);
-				return Pointer.Box(elt, World.IdToType[Record.Archetype.Signature[ComponentIndex]]);
-			}
-		}
+		public unsafe Type Current => World.IdToType[Record.Archetype.Signature[ComponentIndex]];
 	}
 	#endif
 

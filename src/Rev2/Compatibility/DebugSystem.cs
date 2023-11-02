@@ -10,7 +10,7 @@ public abstract class DebugSystem : System
 {
 	protected DebugSystem(World world) : base(world) { }
 
-	protected World.ComponentEnumerator Debug_GetAllComponents(EntityId entity) => World.Debug_GetAllComponents(entity);
+	protected World.ComponentTypeEnumerator Debug_GetAllComponentTypes(EntityId entity) => World.Debug_GetAllComponentTypes(entity);
 	protected Filter.EntityEnumerator Debug_GetEntities(Type componentType) => World.Debug_GetEntities(componentType);
 	protected IEnumerable<Type> Debug_SearchComponentType(string typeString) => World.Debug_SearchComponentType(typeString);
 }

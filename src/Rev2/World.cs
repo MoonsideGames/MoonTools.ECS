@@ -407,6 +407,18 @@ public class World : IDisposable
 		return relationStorage.HasOutRelation(entity);
 	}
 
+	public int OutRelationCount<T>(in EntityId entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutRelationCount(entity);
+	}
+
+	public EntityId NthOutRelation<T>(in EntityId entity, int n) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutNth(entity, n);
+	}
+
 	public ReverseSpanEnumerator<EntityId> InRelations<T>(EntityId entity) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
@@ -423,6 +435,18 @@ public class World : IDisposable
 	{
 		var relationStorage = GetRelationStorage<T>();
 		return relationStorage.HasInRelation(entity);
+	}
+
+	public int InRelationCount<T>(in EntityId entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InRelationCount(entity);
+	}
+
+	public EntityId NthInRelation<T>(in EntityId entity, int n) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InNth(entity, n);
 	}
 
 	// used as a fast path by Archetype.ClearAll and snapshot restore

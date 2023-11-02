@@ -25,8 +25,12 @@ public abstract class EntityComponentReader
 	protected ReverseSpanEnumerator<EntityId> OutRelations<T>(in EntityId entity) where T : unmanaged => World.OutRelations<T>(entity);
 	protected EntityId OutRelationSingleton<T>(in EntityId entity) where T : unmanaged => World.OutRelationSingleton<T>(entity);
 	protected bool HasOutRelation<T>(in EntityId entity) where T : unmanaged => World.HasOutRelation<T>(entity);
+	protected int OutRelationCount<T>(in EntityId entity) where T : unmanaged => World.OutRelationCount<T>(entity);
+	protected EntityId NthOutRelation<T>(in EntityId entity, int n) where T : unmanaged => World.NthOutRelation<T>(entity, n);
 
 	protected ReverseSpanEnumerator<EntityId> InRelations<T>(in EntityId entity) where T : unmanaged => World.InRelations<T>(entity);
 	protected EntityId InRelationSingleton<T>(in EntityId entity) where T : unmanaged => World.InRelationSingleton<T>(entity);
 	protected bool HasInRelation<T>(in EntityId entity) where T : unmanaged => World.HasInRelation<T>(entity);
+	protected int InRelationCount<T>(in EntityId entity) where T : unmanaged => World.InRelationCount<T>(entity);
+	protected EntityId NthInRelation<T>(in EntityId entity, int n) where T : unmanaged => World.NthInRelation<T>(entity, n);
 }

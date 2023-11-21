@@ -6,7 +6,7 @@ public abstract class System : Manipulator
 {
 	protected System(World world) : base(world) { }
 
-	public abstract void Update();
+	public abstract void Update(TimeSpan delta);
 
 	protected ReadOnlySpan<T> ReadMessages<T>() where T : unmanaged => World.ReadMessages<T>();
 	protected T ReadMessage<T>() where T : unmanaged => World.ReadMessage<T>();

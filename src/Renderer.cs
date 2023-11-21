@@ -1,7 +1,6 @@
-﻿namespace MoonTools.ECS
+﻿namespace MoonTools.ECS;
+
+public abstract class Renderer : EntityComponentReader
 {
-	public abstract class Renderer : EntityComponentReader
-	{
-		public Renderer(World world) : base(world) { }
-	}
+	public Renderer(World world) : base(world) { }
 }

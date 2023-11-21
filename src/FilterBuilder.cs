@@ -4,42 +4,40 @@ namespace MoonTools.ECS
 {
 	public struct FilterBuilder
 	{
-		private TypeIndices ComponentTypeIndices;
-		private FilterStorage FilterStorage;
-		private IndexableSet<int> Included;
-		private IndexableSet<int> Excluded;
+		World World;
+		IndexableSet<TypeId> Included;
+		IndexableSet<TypeId> Excluded;
 
-		internal FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices)
+		internal FilterBuilder(World world)
 		{
-			FilterStorage = filterStorage;
-			ComponentTypeIndices = componentTypeIndices;
-			Included = new IndexableSet<int>();
-			Excluded = new IndexableSet<int>();
+			World = world;
+			Included = new IndexableSet<TypeId>();
+			Excluded = new IndexableSet<TypeId>();
 		}
 
-		private FilterBuilder(FilterStorage filterStorage, TypeIndices componentTypeIndices, IndexableSet<int> included, IndexableSet<int> excluded)
+		private FilterBuilder(World world, IndexableSet<TypeId> included, IndexableSet<TypeId> excluded)
 		{
-			FilterStorage = filterStorage;
-			ComponentTypeIndices = componentTypeIndices;
+			World = world;
 			Included = included;
 			Excluded = excluded;
 		}
 
-		public FilterBuilder Include<TComponent>() where TComponent : unmanaged
+		public FilterBuilder Include<T>() where T : unmanaged
 		{
-			Included.Add(ComponentTypeIndices.GetIndex<TComponent>());
-			return new FilterBuilder(FilterStorage, ComponentTypeIndices, Included, Excluded);
+			Included.Add(World.GetComponentTypeId<T>());
+			return new FilterBuilder(World, Included, Excluded);
 		}
 
-		public FilterBuilder Exclude<TComponent>() where TComponent : unmanaged
+		public FilterBuilder Exclude<T>() where T : unmanaged
 		{
-			Excluded.Add(ComponentTypeIndices.GetIndex<TComponent>());
-			return new FilterBuilder(FilterStorage, ComponentTypeIndices, Included, Excluded);
+			Excluded.Add(World.GetComponentTypeId<T>());
+			return new FilterBuilder(World, Included, Excluded);
 		}
 
 		public Filter Build()
 		{
-			return FilterStorage.CreateFilter(Included, Excluded);
+			var signature = new FilterSignature(Included, Excluded);
+			return World.GetFilter(signature);
 		}
 	}
 }

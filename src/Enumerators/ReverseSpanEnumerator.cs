@@ -1,36 +1,35 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+public ref struct ReverseSpanEnumerator<T>
 {
-	public ref struct ReverseSpanEnumerator<T>
+	private ReadOnlySpan<T> Span;
+	private int Index;
+
+	public ReverseSpanEnumerator<T> GetEnumerator() => this;
+
+	public T Current => Span[Index];
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public bool MoveNext()
 	{
-		private ReadOnlySpan<T> Span;
-		private int index;
-
-		public ReverseSpanEnumerator<T> GetEnumerator() => this;
-
-		public T Current => Span[index];
-
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public bool MoveNext()
+		if (Index > 0)
 		{
-			if (index > 0)
-			{
-				index -= 1;
-				return true;
-			}
-
-			return false;
+			Index -= 1;
+			return true;
 		}
 
-		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public ReverseSpanEnumerator(Span<T> span)
-		{
-			Span = span;
-			index = span.Length;
-		}
-
-		public static ReverseSpanEnumerator<T> Empty => new ReverseSpanEnumerator<T>();
+		return false;
 	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	public ReverseSpanEnumerator(Span<T> span)
+	{
+		Span = span;
+		Index = span.Length;
+	}
+
+	public static ReverseSpanEnumerator<T> Empty => new ReverseSpanEnumerator<T>();
 }

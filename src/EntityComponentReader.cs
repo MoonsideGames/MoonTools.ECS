@@ -1,127 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
+﻿namespace MoonTools.ECS;
 
-namespace MoonTools.ECS
+public abstract class EntityComponentReader
 {
-	public abstract class EntityComponentReader
+	protected readonly World World;
+	public FilterBuilder FilterBuilder => World.FilterBuilder;
+
+	protected EntityComponentReader(World world)
 	{
-		internal readonly World World;
-		internal EntityStorage EntityStorage => World.EntityStorage;
-		internal ComponentDepot ComponentDepot => World.ComponentDepot;
-		internal RelationDepot RelationDepot => World.RelationDepot;
-		protected FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
-		internal FilterStorage FilterStorage => World.FilterStorage;
-		internal TypeIndices ComponentTypeIndices => World.ComponentTypeIndices;
-		internal TypeIndices RelationTypeIndices => World.RelationTypeIndices;
-
-		public EntityComponentReader(World world)
-		{
-			World = world;
-		}
-
-		protected string GetTag(in Entity entity)
-		{
-			return World.GetTag(entity);
-		}
-
-		protected ReadOnlySpan<TComponent> ReadComponents<TComponent>() where TComponent : unmanaged
-		{
-			return ComponentDepot.ReadComponents<TComponent>();
-		}
-
-		protected bool Has<TComponent>(in Entity entity) where TComponent : unmanaged
-		{
-			var storageIndex = ComponentTypeIndices.GetIndex<TComponent>();
-			return EntityStorage.HasComponent(entity.ID, storageIndex);
-		}
-
-		protected bool Some<TComponent>() where TComponent : unmanaged
-		{
-			return ComponentDepot.Some<TComponent>();
-		}
-
-		protected ref readonly TComponent Get<TComponent>(in Entity entity) where TComponent : unmanaged
-		{
-			return ref ComponentDepot.Get<TComponent>(entity.ID);
-		}
-
-		protected ref readonly TComponent GetSingleton<TComponent>() where TComponent : unmanaged
-		{
-			return ref ComponentDepot.GetFirst<TComponent>();
-		}
-
-		protected Entity GetSingletonEntity<TComponent>() where TComponent : unmanaged
-		{
-			return ComponentDepot.GetSingletonEntity<TComponent>();
-		}
-
-		protected ReverseSpanEnumerator<(Entity, Entity)> Relations<TRelationKind>() where TRelationKind : unmanaged
-		{
-			return RelationDepot.Relations<TRelationKind>();
-		}
-
-		protected bool Related<TRelationKind>(in Entity a, in Entity b) where TRelationKind : unmanaged
-		{
-			return RelationDepot.Related<TRelationKind>(a.ID, b.ID);
-		}
-
-		protected TRelationKind GetRelationData<TRelationKind>(in Entity a, in Entity b) where TRelationKind : unmanaged
-		{
-			return RelationDepot.Get<TRelationKind>(a, b);
-		}
-
-		// relations go A->B, so given A, will give all entities in outgoing relations of this kind.
-		protected ReverseSpanEnumerator<Entity> OutRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.OutRelations<TRelationKind>(entity.ID);
-		}
-
-		protected Entity OutRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.OutRelationSingleton<TRelationKind>(entity.ID);
-		}
-
-		// NOTE: this WILL crash if at least n + 1 relations do not exist!
-		protected Entity NthOutRelation<TRelationKind>(in Entity entity, int n) where TRelationKind : unmanaged
-		{
-			return RelationDepot.NthOutRelation<TRelationKind>(entity.ID, n);
-		}
-
-		protected bool HasOutRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.HasOutRelation<TRelationKind>(entity.ID);
-		}
-
-		protected int OutRelationCount<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.OutRelationCount<TRelationKind>(entity.ID);
-		}
-
-		// Relations go A->B, so given B, will give all entities in incoming A relations of this kind.
-		protected ReverseSpanEnumerator<Entity> InRelations<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.InRelations<TRelationKind>(entity.ID);
-		}
-
-		protected Entity InRelationSingleton<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.InRelationSingleton<TRelationKind>(entity.ID);
-		}
-
-		// NOTE: this WILL crash if at least n + 1 relations do not exist!
-		protected Entity NthInRelation<TRelationKind>(in Entity entity, int n) where TRelationKind : unmanaged
-		{
-			return RelationDepot.NthInRelation<TRelationKind>(entity.ID, n);
-		}
-
-		protected bool HasInRelation<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.HasInRelation<TRelationKind>(entity.ID);
-		}
-
-		protected int InRelationCount<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
-		{
-			return RelationDepot.InRelationCount<TRelationKind>(entity.ID);
-		}
+		World = world;
 	}
+
+	protected string GetTag(in Entity entity) => World.GetTag(entity);
+
+	protected bool Has<T>(in Entity Entity) where T : unmanaged => World.Has<T>(Entity);
+	protected bool Some<T>() where T : unmanaged => World.Some<T>();
+	protected ref T Get<T>(in Entity Entity) where T : unmanaged => ref World.Get<T>(Entity);
+	protected ref T GetSingleton<T>() where T : unmanaged => ref World.GetSingleton<T>();
+	protected Entity GetSingletonEntity<T>() where T : unmanaged => World.GetSingletonEntity<T>();
+
+	protected ReverseSpanEnumerator<(Entity, Entity)> Relations<T>() where T : unmanaged => World.Relations<T>();
+	protected bool Related<T>(in Entity entityA, in Entity entityB) where T : unmanaged => World.Related<T>(entityA, entityB);
+	protected T GetRelationData<T>(in Entity entityA, in Entity entityB) where T : unmanaged => World.GetRelationData<T>(entityA, entityB);
+
+	protected ReverseSpanEnumerator<Entity> OutRelations<T>(in Entity entity) where T : unmanaged => World.OutRelations<T>(entity);
+	protected Entity OutRelationSingleton<T>(in Entity entity) where T : unmanaged => World.OutRelationSingleton<T>(entity);
+	protected bool HasOutRelation<T>(in Entity entity) where T : unmanaged => World.HasOutRelation<T>(entity);
+	protected int OutRelationCount<T>(in Entity entity) where T : unmanaged => World.OutRelationCount<T>(entity);
+	protected Entity NthOutRelation<T>(in Entity entity, int n) where T : unmanaged => World.NthOutRelation<T>(entity, n);
+
+	protected ReverseSpanEnumerator<Entity> InRelations<T>(in Entity entity) where T : unmanaged => World.InRelations<T>(entity);
+	protected Entity InRelationSingleton<T>(in Entity entity) where T : unmanaged => World.InRelationSingleton<T>(entity);
+	protected bool HasInRelation<T>(in Entity entity) where T : unmanaged => World.HasInRelation<T>(entity);
+	protected int InRelationCount<T>(in Entity entity) where T : unmanaged => World.InRelationCount<T>(entity);
+	protected Entity NthInRelation<T>(in Entity entity, int n) where T : unmanaged => World.NthInRelation<T>(entity, n);
 }

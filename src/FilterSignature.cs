@@ -1,71 +1,69 @@
 ﻿using System;
-using System.Collections.Generic;
 using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+public struct FilterSignature : IEquatable<FilterSignature>
 {
-	public struct FilterSignature : IEquatable<FilterSignature>
+	public readonly IndexableSet<TypeId> Included;
+	public readonly IndexableSet<TypeId> Excluded;
+
+	public FilterSignature(IndexableSet<TypeId> included, IndexableSet<TypeId> excluded)
 	{
-		public readonly IndexableSet<int> Included;
-		public readonly IndexableSet<int> Excluded;
+		Included = included;
+		Excluded = excluded;
+	}
 
-		public FilterSignature(IndexableSet<int> included, IndexableSet<int> excluded)
-		{
-			Included = included;
-			Excluded = excluded;
-		}
+	public override bool Equals(object? obj)
+	{
+		return obj is FilterSignature signature && Equals(signature);
+	}
 
-		public override bool Equals(object? obj)
+	public bool Equals(FilterSignature other)
+	{
+		foreach (var included in Included)
 		{
-			return obj is FilterSignature signature && Equals(signature);
-		}
-
-		public bool Equals(FilterSignature other)
-		{
-			foreach (var included in Included)
+			if (!other.Included.Contains(included))
 			{
-				if (!other.Included.Contains(included))
-				{
-					return false;
-				}
+				return false;
 			}
-
-			foreach (var excluded in Excluded)
-			{
-				if (!other.Excluded.Contains(excluded))
-				{
-					return false;
-				}
-			}
-
-			return true;
 		}
 
-		public override int GetHashCode()
+		foreach (var excluded in Excluded)
 		{
-			var hashcode = 1;
-
-			foreach (var type in Included)
+			if (!other.Excluded.Contains(excluded))
 			{
-				hashcode = HashCode.Combine(hashcode, type);
+				return false;
 			}
-
-			foreach (var type in Excluded)
-			{
-				hashcode = HashCode.Combine(hashcode, type);
-			}
-
-			return hashcode;
 		}
 
-		public static bool operator ==(FilterSignature left, FilterSignature right)
+		return true;
+	}
+
+	public override int GetHashCode()
+	{
+		var hashcode = 1;
+
+		foreach (var type in Included)
 		{
-			return left.Equals(right);
+			hashcode = HashCode.Combine(hashcode, type);
 		}
 
-		public static bool operator !=(FilterSignature left, FilterSignature right)
+		foreach (var type in Excluded)
 		{
-			return !(left == right);
+			hashcode = HashCode.Combine(hashcode, type);
 		}
+
+		return hashcode;
+	}
+
+	public static bool operator ==(FilterSignature left, FilterSignature right)
+	{
+		return left.Equals(right);
+	}
+
+	public static bool operator !=(FilterSignature left, FilterSignature right)
+	{
+		return !(left == right);
 	}
 }

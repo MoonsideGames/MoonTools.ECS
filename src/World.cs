@@ -1,194 +1,520 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+public class World : IDisposable
 {
-	public class World
-	{
-		internal readonly static TypeIndices ComponentTypeIndices = new TypeIndices();
-		internal readonly static TypeIndices RelationTypeIndices = new TypeIndices();
-		internal readonly EntityStorage EntityStorage = new EntityStorage();
-		internal readonly ComponentDepot ComponentDepot;
-		internal readonly MessageDepot MessageDepot = new MessageDepot();
-		internal readonly RelationDepot RelationDepot;
-		internal readonly FilterStorage FilterStorage;
-		public FilterBuilder FilterBuilder => new FilterBuilder(FilterStorage, ComponentTypeIndices);
+	// Get TypeId from a Type
+	private readonly Dictionary<Type, TypeId> TypeToId = new Dictionary<Type, TypeId>();
 
-		public World()
-		{
-			ComponentDepot = new ComponentDepot(ComponentTypeIndices);
-			RelationDepot = new RelationDepot(EntityStorage, RelationTypeIndices);
-			FilterStorage = new FilterStorage(EntityStorage, ComponentTypeIndices);
-		}
-
-		public Entity CreateEntity(string tag = "")
-		{
-			return EntityStorage.Create(tag);
-		}
-
-		public void Tag(Entity entity, string tag)
-		{
-			EntityStorage.Tag(entity, tag);
-		}
-
-		public string GetTag(Entity entity)
-		{
-			return EntityStorage.Tag(entity);
-		}
-
-		public void Set<TComponent>(Entity entity, in TComponent component) where TComponent : unmanaged
-		{
 #if DEBUG
-			// check for use after destroy
-			if (!EntityStorage.Exists(entity))
-			{
-				throw new InvalidOperationException("This entity is not valid!");
-			}
+	private Dictionary<TypeId, Type> IdToType = new Dictionary<TypeId, Type>();
 #endif
-			ComponentDepot.Set<TComponent>(entity.ID, component);
 
-			if (EntityStorage.SetComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
+	// Get element size from a TypeId
+	private readonly Dictionary<TypeId, int> ElementSizes = new Dictionary<TypeId, int>();
+
+	// Filters
+	internal readonly Dictionary<FilterSignature, Filter> FilterIndex = new Dictionary<FilterSignature, Filter>();
+	private readonly Dictionary<TypeId, List<Filter>> TypeToFilter = new Dictionary<TypeId, List<Filter>>();
+
+	// TODO: can we make the tag an native array of chars at some point?
+	internal Dictionary<Entity, string> EntityTags = new Dictionary<Entity, string>();
+
+	// Relation Storages
+	internal Dictionary<TypeId, RelationStorage> RelationIndex = new Dictionary<TypeId, RelationStorage>();
+	internal Dictionary<Entity, IndexableSet<TypeId>> EntityRelationIndex = new Dictionary<Entity, IndexableSet<TypeId>>();
+
+	// Message Storages
+	private Dictionary<TypeId, MessageStorage> MessageIndex = new Dictionary<TypeId, MessageStorage>();
+
+	public FilterBuilder FilterBuilder => new FilterBuilder(this);
+
+	internal readonly Dictionary<TypeId, ComponentStorage> ComponentIndex = new Dictionary<TypeId, ComponentStorage>();
+	internal Dictionary<Entity, IndexableSet<TypeId>> EntityComponentIndex = new Dictionary<Entity, IndexableSet<TypeId>>();
+
+	internal IdAssigner EntityIdAssigner = new IdAssigner();
+	private IdAssigner TypeIdAssigner = new IdAssigner();
+
+	private bool IsDisposed;
+
+	internal TypeId GetTypeId<T>() where T : unmanaged
+	{
+		if (TypeToId.ContainsKey(typeof(T)))
+		{
+			return TypeToId[typeof(T)];
+		}
+
+		var typeId = new TypeId(TypeIdAssigner.Assign());
+		TypeToId.Add(typeof(T), typeId);
+		ElementSizes.Add(typeId, Unsafe.SizeOf<T>());
+
+#if DEBUG
+		IdToType.Add(typeId, typeof(T));
+#endif
+
+		return typeId;
+	}
+
+	internal TypeId GetComponentTypeId<T>() where T : unmanaged
+	{
+		var typeId = GetTypeId<T>();
+		if (ComponentIndex.TryGetValue(typeId, out var componentStorage))
+		{
+			return typeId;
+		}
+
+		componentStorage = new ComponentStorage(typeId, ElementSizes[typeId]);
+		ComponentIndex.Add(typeId, componentStorage);
+		TypeToFilter.Add(typeId, new List<Filter>());
+		return typeId;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private ComponentStorage GetComponentStorage<T>() where T : unmanaged
+	{
+		var typeId = GetTypeId<T>();
+		if (ComponentIndex.TryGetValue(typeId, out var componentStorage))
+		{
+			return componentStorage;
+		}
+
+		componentStorage = new ComponentStorage(typeId, ElementSizes[typeId]);
+		ComponentIndex.Add(typeId, componentStorage);
+		TypeToFilter.Add(typeId, new List<Filter>());
+		return componentStorage;
+	}
+
+	// FILTERS
+
+	internal Filter GetFilter(FilterSignature signature)
+	{
+		if (!FilterIndex.TryGetValue(signature, out var filter))
+		{
+			filter = new Filter(this, signature);
+
+			foreach (var typeId in signature.Included)
 			{
-				FilterStorage.Check<TComponent>(entity.ID);
+				TypeToFilter[typeId].Add(filter);
+			}
+
+			foreach (var typeId in signature.Excluded)
+			{
+				TypeToFilter[typeId].Add(filter);
+			}
+
+			FilterIndex.Add(signature, filter);
+		}
+
+		return filter;
+	}
+
+	// ENTITIES
+
+	public Entity CreateEntity(string tag = "")
+	{
+		var entity = new Entity(EntityIdAssigner.Assign());
+
+		if (!EntityComponentIndex.ContainsKey(entity))
+		{
+			EntityRelationIndex.Add(entity, new IndexableSet<TypeId>());
+			EntityComponentIndex.Add(entity, new IndexableSet<TypeId>());
+		}
+
+		EntityTags[entity] = tag;
+
+		return entity;
+	}
+
+	public void Tag(Entity entity, string tag)
+	{
+		EntityTags[entity] = tag;
+	}
+
+	public string GetTag(Entity entity)
+	{
+		return EntityTags[entity];
+	}
+
+	public void Destroy(in Entity entity)
+	{
+		// remove all components from storages
+		foreach (var componentTypeIndex in EntityComponentIndex[entity])
+		{
+			var componentStorage = ComponentIndex[componentTypeIndex];
+			componentStorage.Remove(entity);
+
+			foreach (var filter in TypeToFilter[componentTypeIndex])
+			{
+				filter.RemoveEntity(entity);
 			}
 		}
 
-		// untyped version for Transfer
-		// no filter check because filter state is copied directly
-		internal unsafe void Set(Entity entity, int componentTypeIndex, void* component)
+		// remove all relations from storage
+		foreach (var relationTypeIndex in EntityRelationIndex[entity])
 		{
-			ComponentDepot.Set(entity.ID, componentTypeIndex, component);
-			EntityStorage.SetComponent(entity.ID, componentTypeIndex);
+			var relationStorage = RelationIndex[relationTypeIndex];
+			relationStorage.RemoveEntity(entity);
 		}
 
-		public void Remove<TComponent>(in Entity entity) where TComponent : unmanaged
+		EntityComponentIndex[entity].Clear();
+		EntityRelationIndex[entity].Clear();
+
+		// recycle ID
+		EntityIdAssigner.Unassign(entity.ID);
+	}
+
+	// COMPONENTS
+
+	public bool Has<T>(in Entity entity) where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return storage.Has(entity);
+	}
+
+	internal bool Has(in Entity entity, in TypeId typeId)
+	{
+		return EntityComponentIndex[entity].Contains(typeId);
+	}
+
+	public bool Some<T>() where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return storage.Any();
+	}
+
+	public ref T Get<T>(in Entity entity) where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return ref storage.Get<T>(entity);
+	}
+
+	public ref T GetSingleton<T>() where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return ref storage.GetFirst<T>();
+	}
+
+	public Entity GetSingletonEntity<T>() where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return storage.FirstEntity();
+	}
+
+	public void Set<T>(in Entity entity, in T component) where T : unmanaged
+	{
+		var componentStorage = GetComponentStorage<T>();
+
+		if (!componentStorage.Set(entity, component))
 		{
-			if (EntityStorage.RemoveComponent(entity.ID, ComponentTypeIndices.GetIndex<TComponent>()))
+			EntityComponentIndex[entity].Add(componentStorage.TypeId);
+
+			foreach (var filter in TypeToFilter[componentStorage.TypeId])
 			{
-				// Run filter storage update first so that the entity state is still valid in the remove callback.
-				FilterStorage.Check<TComponent>(entity.ID);
-				ComponentDepot.Remove<TComponent>(entity.ID);
+				filter.Check(entity);
 			}
 		}
+	}
 
-		public void Relate<TRelationKind>(in Entity entityA, in Entity entityB, TRelationKind relationData) where TRelationKind : unmanaged
+	public void Remove<T>(in Entity entity) where T : unmanaged
+	{
+		var componentStorage = GetComponentStorage<T>();
+
+		if (componentStorage.Remove(entity))
 		{
-			RelationDepot.Set(entityA, entityB, relationData);
-			var relationTypeIndex = RelationTypeIndices.GetIndex<TRelationKind>();
-			EntityStorage.AddRelationKind(entityA.ID, relationTypeIndex);
-			EntityStorage.AddRelationKind(entityB.ID, relationTypeIndex);
-		}
+			EntityComponentIndex[entity].Remove(componentStorage.TypeId);
 
-		public void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged
-		{
-			var (aEmpty, bEmpty) = RelationDepot.Remove<TRelationKind>(entityA, entityB);
-
-			if (aEmpty)
+			foreach (var filter in TypeToFilter[componentStorage.TypeId])
 			{
-				EntityStorage.RemoveRelation(entityA.ID, RelationTypeIndices.GetIndex<TRelationKind>());
-			}
-
-			if (bEmpty)
-			{
-				EntityStorage.RemoveRelation(entityB.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+				filter.Check(entity);
 			}
 		}
+	}
 
-		public void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged
+	// RELATIONS
+
+	private RelationStorage RegisterRelationType(TypeId typeId)
+	{
+		var relationStorage = new RelationStorage(ElementSizes[typeId]);
+		RelationIndex.Add(typeId, relationStorage);
+		return relationStorage;
+	}
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private RelationStorage GetRelationStorage<T>() where T : unmanaged
+	{
+		var typeId = GetTypeId<T>();
+		if (RelationIndex.TryGetValue(typeId, out var relationStorage))
 		{
-			RelationDepot.UnrelateAll<TRelationKind>(entity.ID);
-			EntityStorage.RemoveRelation(entity.ID, RelationTypeIndices.GetIndex<TRelationKind>());
+			return relationStorage;
 		}
 
-		public void Send<TMessage>(in TMessage message) where TMessage : unmanaged
+		return RegisterRelationType(typeId);
+	}
+
+	public void Relate<T>(in Entity entityA, in Entity entityB, in T relation) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		relationStorage.Set(entityA, entityB, relation);
+		EntityRelationIndex[entityA].Add(TypeToId[typeof(T)]);
+		EntityRelationIndex[entityB].Add(TypeToId[typeof(T)]);
+	}
+
+	public void Unrelate<T>(in Entity entityA, in Entity entityB) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		relationStorage.Remove(entityA, entityB);
+	}
+
+	public void UnrelateAll<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		relationStorage.RemoveEntity(entity);
+	}
+
+	public bool Related<T>(in Entity entityA, in Entity entityB) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.Has(entityA, entityB);
+	}
+
+	public T GetRelationData<T>(in Entity entityA, in Entity entityB) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.Get<T>(entityA, entityB);
+	}
+
+	public ReverseSpanEnumerator<(Entity, Entity)> Relations<T>() where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.All();
+	}
+
+	public ReverseSpanEnumerator<Entity> OutRelations<T>(Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutRelations(entity);
+	}
+
+	public Entity OutRelationSingleton<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutFirst(entity);
+	}
+
+	public bool HasOutRelation<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.HasOutRelation(entity);
+	}
+
+	public int OutRelationCount<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutRelationCount(entity);
+	}
+
+	public Entity NthOutRelation<T>(in Entity entity, int n) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.OutNth(entity, n);
+	}
+
+	public ReverseSpanEnumerator<Entity> InRelations<T>(Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InRelations(entity);
+	}
+
+	public Entity InRelationSingleton<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InFirst(entity);
+	}
+
+	public bool HasInRelation<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.HasInRelation(entity);
+	}
+
+	public int InRelationCount<T>(in Entity entity) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InRelationCount(entity);
+	}
+
+	public Entity NthInRelation<T>(in Entity entity, int n) where T : unmanaged
+	{
+		var relationStorage = GetRelationStorage<T>();
+		return relationStorage.InNth(entity, n);
+	}
+
+	// MESSAGES
+
+	private TypeId GetMessageTypeId<T>() where T : unmanaged
+	{
+		var typeId = GetTypeId<T>();
+
+		if (!MessageIndex.ContainsKey(typeId))
 		{
-			MessageDepot.Add(message);
+			MessageIndex.Add(typeId, new MessageStorage(Unsafe.SizeOf<T>()));
 		}
 
-		public void Send<TMessage>(in Entity entity, in TMessage message) where TMessage : unmanaged
-		{
-			MessageDepot.Add(entity.ID, message);
-		}
+		return typeId;
+	}
 
-		public void Destroy(in Entity entity)
+	public void Send<T>(in T message) where T : unmanaged
+	{
+		var typeId = GetMessageTypeId<T>();
+		MessageIndex[typeId].Add(message);
+	}
+
+	public bool SomeMessage<T>() where T : unmanaged
+	{
+		var typeId = GetMessageTypeId<T>();
+		return MessageIndex[typeId].Some();
+	}
+
+	public ReadOnlySpan<T> ReadMessages<T>() where T : unmanaged
+	{
+		var typeId = GetMessageTypeId<T>();
+		return MessageIndex[typeId].All<T>();
+	}
+
+	public T ReadMessage<T>() where T : unmanaged
+	{
+		var typeId = GetMessageTypeId<T>();
+		return MessageIndex[typeId].First<T>();
+	}
+
+	public void ClearMessages<T>() where T : unmanaged
+	{
+		var typeId = GetMessageTypeId<T>();
+		MessageIndex[typeId].Clear();
+	}
+
+	// TODO: temporary component storage?
+	public void FinishUpdate()
+	{
+		foreach (var (_, messageStorage) in MessageIndex)
 		{
-			foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+			messageStorage.Clear();
+		}
+	}
+
+	// DEBUG
+	// NOTE: these methods are very inefficient
+	// they should only be used in debugging contexts!!
+#if DEBUG
+	public ComponentTypeEnumerator Debug_GetAllComponentTypes(Entity entity)
+	{
+		return new ComponentTypeEnumerator(this, EntityComponentIndex[entity]);
+	}
+
+	public IEnumerable<Entity> Debug_GetEntities(Type componentType)
+	{
+		var storage = ComponentIndex[TypeToId[componentType]];
+		return storage.Debug_GetEntities();
+	}
+
+	public IEnumerable<Type> Debug_SearchComponentType(string typeString)
+	{
+		foreach (var type in TypeToId.Keys)
+		{
+			if (type.ToString().ToLower().Contains(typeString.ToLower()))
 			{
-				// Run filter storage update first so that the entity state is still valid in the remove callback.
-				FilterStorage.RemoveEntity(entity.ID, componentTypeIndex);
-				ComponentDepot.Remove(entity.ID, componentTypeIndex);
+				yield return type;
 			}
+		}
+	}
 
-			foreach (var relationTypeIndex in EntityStorage.RelationTypeIndices(entity.ID))
-			{
-				RelationDepot.UnrelateAll(entity.ID, relationTypeIndex);
-				EntityStorage.RemoveRelation(entity.ID, relationTypeIndex);
-			}
+	public ref struct ComponentTypeEnumerator
+	{
+		private World World;
+		private IndexableSet<TypeId> Types;
+		private int ComponentIndex;
 
-			EntityStorage.Destroy(entity);
+		public ComponentTypeEnumerator GetEnumerator() => this;
+
+		internal ComponentTypeEnumerator(
+			World world,
+			IndexableSet<TypeId> types
+		)
+		{
+			World = world;
+			Types = types;
+			ComponentIndex = -1;
 		}
 
-
-		public void FinishUpdate()
+		public bool MoveNext()
 		{
-			MessageDepot.Clear();
+			ComponentIndex += 1;
+			return ComponentIndex < Types.Count;
 		}
 
-		public void Clear()
+		public Type Current => World.IdToType[Types[ComponentIndex]];
+	}
+#endif
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!IsDisposed)
 		{
-			EntityStorage.Clear();
-			MessageDepot.Clear();
-			RelationDepot.Clear();
-			ComponentDepot.Clear();
-			FilterStorage.Clear();
-		}
-
-		private Dictionary<int, int> WorldToTransferID = new Dictionary<int, int>();
-
-		/// <summary>
-		/// If you are using the World Transfer feature, call this once after your systems/filters have all been initialized.
-		/// </summary>
-		public void PrepareTransferTo(World other)
-		{
-			other.FilterStorage.CreateMissingStorages(FilterStorage);
-		}
-
-		// FIXME: there's probably a better way to handle Filters so they are not world-bound
-		public unsafe void Transfer(World other, Filter filter, Filter otherFilter)
-		{
-			WorldToTransferID.Clear();
-			other.ComponentDepot.CreateMissingStorages(ComponentDepot);
-			other.RelationDepot.CreateMissingStorages(RelationDepot);
-
-			// destroy all entities matching the filter
-			foreach (var entity in otherFilter.Entities)
+			if (disposing)
 			{
-				other.Destroy(entity);
-			}
-
-			// create entities
-			foreach (var entity in filter.Entities)
-			{
-				var otherWorldEntity = other.CreateEntity(GetTag(entity));
-				WorldToTransferID.Add(entity.ID, otherWorldEntity.ID);
-			}
-
-			// transfer relations
-			RelationDepot.TransferStorage(WorldToTransferID, other.RelationDepot);
-
-			// set components
-			foreach (var entity in filter.Entities)
-			{
-				var otherWorldEntity = WorldToTransferID[entity.ID];
-
-				foreach (var componentTypeIndex in EntityStorage.ComponentTypeIndices(entity.ID))
+				foreach (var componentStorage in ComponentIndex.Values)
 				{
-					other.Set(otherWorldEntity, componentTypeIndex, ComponentDepot.UntypedGet(entity.ID, componentTypeIndex));
+					componentStorage.Dispose();
 				}
+
+				foreach (var relationStorage in RelationIndex.Values)
+				{
+					relationStorage.Dispose();
+				}
+
+				foreach (var messageStorage in MessageIndex.Values)
+				{
+					messageStorage.Dispose();
+				}
+
+				foreach (var typeSet in EntityComponentIndex.Values)
+				{
+					typeSet.Dispose();
+				}
+
+				foreach (var typeSet in EntityRelationIndex.Values)
+				{
+					typeSet.Dispose();
+				}
+
+				foreach (var filter in FilterIndex.Values)
+				{
+					filter.Dispose();
+				}
+
+				EntityIdAssigner.Dispose();
+				TypeIdAssigner.Dispose();
 			}
 
-			// transfer filters last so callbacks trigger correctly
-			FilterStorage.TransferStorage(WorldToTransferID, other.FilterStorage);
+			IsDisposed = true;
 		}
+	}
+
+	// // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+	// ~World()
+	// {
+	//     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+	//     Dispose(disposing: false);
+	// }
+
+	public void Dispose()
+	{
+		// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

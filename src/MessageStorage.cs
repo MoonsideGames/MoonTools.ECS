@@ -1,131 +1,63 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+public class MessageStorage : IDisposable
 {
-	internal abstract class MessageStorage
+	private NativeArray Messages;
+
+	private bool IsDisposed;
+
+	public MessageStorage(int elementSize)
 	{
-		public abstract void Clear();
+		Messages = new NativeArray(elementSize);
 	}
 
-	internal unsafe class MessageStorage<TMessage> : MessageStorage, IDisposable where TMessage : unmanaged
+	public void Add<T>(in T message) where T : unmanaged
 	{
-		private int count = 0;
-		private int capacity = 128;
-		private TMessage* messages;
-		// duplicating storage here for fast iteration
-		private Dictionary<int, NativeArray<TMessage>> entityToMessages = new Dictionary<int, NativeArray<TMessage>>();
-		private bool disposed;
+		Messages.Append(message);
+	}
 
-		public MessageStorage()
+	public bool Some()
+	{
+		return Messages.Count > 0;
+	}
+
+	public ReadOnlySpan<T> All<T>() where T : unmanaged
+	{
+		return Messages.ToSpan<T>();
+	}
+
+	public T First<T>() where T : unmanaged
+	{
+		return Messages.Get<T>(0);
+	}
+
+	public void Clear()
+	{
+		Messages.Clear();
+	}
+
+	private void Dispose(bool disposing)
+	{
+		if (!IsDisposed)
 		{
-			messages = (TMessage*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TMessage>()));
+			Messages.Dispose();
+			IsDisposed = true;
 		}
+	}
 
-		public void Add(in TMessage message)
-		{
-			if (count == capacity)
-			{
-				capacity *= 2;
-				messages = (TMessage*) NativeMemory.Realloc(messages, (nuint) (capacity * Unsafe.SizeOf<TMessage>()));
-			}
+	// ~MessageStorage()
+	// {
+	// 	// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+	// 	Dispose(disposing: false);
+	// }
 
-			messages[count] = message;
-			count += 1;
-		}
-
-		public void Add(int entityID, in TMessage message)
-		{
-			if (!entityToMessages.ContainsKey(entityID))
-			{
-				entityToMessages.Add(entityID, new NativeArray<TMessage>());
-			}
-			entityToMessages[entityID].Add(message);
-
-			Add(message);
-		}
-
-		public bool Some()
-		{
-			return count > 0;
-		}
-
-		public ReadOnlySpan<TMessage> All()
-		{
-			return new ReadOnlySpan<TMessage>(messages, count);
-		}
-
-		public TMessage First()
-		{
-			return messages[0];
-		}
-
-		public ReverseSpanEnumerator<TMessage> WithEntity(int entityID)
-		{
-			if (entityToMessages.TryGetValue(entityID, out var messages))
-			{
-				return messages.GetEnumerator();
-			}
-			else
-			{
-				return ReverseSpanEnumerator<TMessage>.Empty;
-			}
-		}
-
-		public ref readonly TMessage FirstWithEntity(int entityID)
-		{
-			return ref entityToMessages[entityID][0];
-		}
-
-		public bool SomeWithEntity(int entityID)
-		{
-			return entityToMessages.ContainsKey(entityID) && entityToMessages[entityID].Count > 0;
-		}
-
-		public override void Clear()
-		{
-			count = 0;
-			foreach (var set in entityToMessages.Values)
-			{
-				set.Clear();
-			}
-		}
-
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!disposed)
-			{
-				Clear();
-
-				if (disposing)
-				{
-					foreach (var array in entityToMessages.Values)
-					{
-						array.Dispose();
-					}
-				}
-
-				NativeMemory.Free(messages);
-				messages = null;
-
-				disposed = true;
-			}
-		}
-
-		~MessageStorage()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: false);
-		}
-
-		public void Dispose()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: true);
-			GC.SuppressFinalize(this);
-		}
+	public void Dispose()
+	{
+		// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

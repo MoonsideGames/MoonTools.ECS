@@ -1,332 +1,284 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+// TODO: implement this entire class with NativeMemory equivalents, can just memcpy for snapshots
+internal class RelationStorage
 {
-	internal abstract class RelationStorage
+	internal NativeArray Relations;
+	internal NativeArray RelationDatas;
+	internal Dictionary<(Entity, Entity), int> Indices = new Dictionary<(Entity, Entity), int>(16);
+	internal Dictionary<Entity, IndexableSet<Entity>> OutRelationSets = new Dictionary<Entity, IndexableSet<Entity>>(16);
+	internal Dictionary<Entity, IndexableSet<Entity>> InRelationSets = new Dictionary<Entity, IndexableSet<Entity>>(16);
+	private Stack<IndexableSet<Entity>> ListPool = new Stack<IndexableSet<Entity>>();
+
+	private bool IsDisposed;
+
+	public RelationStorage(int relationDataSize)
 	{
-		public abstract unsafe void Set(int entityA, int entityB, void* relationData);
-		public abstract int GetStorageIndex(int entityA, int entityB);
-		public abstract unsafe void* Get(int relationStorageIndex);
-		public abstract void UnrelateAll(int entityID);
-		public abstract ReverseSpanEnumerator<(Entity, Entity)> All();
-		public abstract RelationStorage CreateStorage();
-		public abstract void Clear();
+		Relations = new NativeArray(Unsafe.SizeOf<(Entity, Entity)>());
+		RelationDatas = new NativeArray(relationDataSize);
 	}
 
-	// Relation is the two entities, A related to B.
-	// TRelation is the data attached to the relation.
-	internal unsafe class RelationStorage<TRelation> : RelationStorage, IDisposable where TRelation : unmanaged
+	public ReverseSpanEnumerator<(Entity, Entity)> All()
 	{
-		private int count = 0;
-		private int capacity = 16;
-		private (Entity, Entity)* relations;
-		private TRelation* relationDatas;
-		private Dictionary<(Entity, Entity), int> indices = new Dictionary<(Entity, Entity), int>(16);
-		private Dictionary<int, IndexableSet<Entity>> outRelations = new Dictionary<int, IndexableSet<Entity>>(16);
-		private Dictionary<int, IndexableSet<Entity>> inRelations = new Dictionary<int, IndexableSet<Entity>>(16);
-		private Stack<IndexableSet<Entity>> listPool = new Stack<IndexableSet<Entity>>();
+		return new ReverseSpanEnumerator<(Entity, Entity)>(Relations.ToSpan<(Entity, Entity)>());
+	}
 
-		private bool disposed;
+	public unsafe void Set<T>(in Entity entityA, in Entity entityB, in T relationData) where T : unmanaged
+	{
+		var relation = (entityA, entityB);
 
-		public RelationStorage()
+		if (Indices.TryGetValue(relation, out var index))
 		{
-			relations = ((Entity, Entity)*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<(Entity, Entity)>()));
-			relationDatas = (TRelation*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TRelation>()));
+			RelationDatas.Set(index, relationData);
+			return;
 		}
 
-		public override ReverseSpanEnumerator<(Entity, Entity)> All()
+		if (!OutRelationSets.ContainsKey(entityA))
 		{
-			return new ReverseSpanEnumerator<(Entity, Entity)>(new Span<(Entity, Entity)>(relations, count));
+			OutRelationSets[entityA] = AcquireHashSetFromPool();
 		}
+		OutRelationSets[entityA].Add(entityB);
 
-		public void Set(in Entity entityA, in Entity entityB, TRelation relationData)
+		if (!InRelationSets.ContainsKey(entityB))
 		{
-			var relation = (entityA, entityB);
-
-			if (indices.TryGetValue(relation, out var index))
-			{
-				relationDatas[index] = relationData;
-				return;
-			}
-
-			var idA = entityA.ID;
-			var idB = entityB.ID;
-
-			if (!outRelations.ContainsKey(idA))
-			{
-				outRelations[idA] = AcquireHashSetFromPool();
-			}
-			outRelations[idA].Add(idB);
-
-			if (!inRelations.ContainsKey(idB))
-			{
-				inRelations[idB] = AcquireHashSetFromPool();
-			}
-			inRelations[idB].Add(idA);
-
-			if (count >= capacity)
-			{
-				capacity *= 2;
-				relations = ((Entity, Entity)*) NativeMemory.Realloc(relations, (nuint) (capacity * Unsafe.SizeOf<(Entity, Entity)>()));
-				relationDatas = (TRelation*) NativeMemory.Realloc(relationDatas, (nuint) (capacity * Unsafe.SizeOf<TRelation>()));
-			}
-
-			relations[count] = relation;
-			relationDatas[count] = relationData;
-			indices.Add(relation, count);
-			count += 1;
+			InRelationSets[entityB] = AcquireHashSetFromPool();
 		}
+		InRelationSets[entityB].Add(entityA);
 
-		public TRelation Get(in Entity entityA, in Entity entityB)
+		Relations.Append(relation);
+		RelationDatas.Append(relationData);
+		Indices.Add(relation, Relations.Count - 1);
+	}
+
+	public ref T Get<T>(in Entity entityA, in Entity entityB) where T : unmanaged
+	{
+		var relationIndex = Indices[(entityA, entityB)];
+		return ref RelationDatas.Get<T>(relationIndex);
+	}
+
+	public bool Has(Entity entityA, Entity entityB)
+	{
+		return Indices.ContainsKey((entityA, entityB));
+	}
+
+	public ReverseSpanEnumerator<Entity> OutRelations(Entity Entity)
+	{
+		if (OutRelationSets.TryGetValue(Entity, out var entityOutRelations))
 		{
-			return relationDatas[indices[(entityA, entityB)]];
+			return entityOutRelations.GetEnumerator();
 		}
-
-		public bool Has((Entity, Entity) relation)
+		else
 		{
-			return indices.ContainsKey(relation);
+			return ReverseSpanEnumerator<Entity>.Empty;
 		}
+	}
 
-		public ReverseSpanEnumerator<Entity> OutRelations(int entityID)
-		{
-			if (outRelations.TryGetValue(entityID, out var entityOutRelations))
-			{
-				return entityOutRelations.GetEnumerator();
-			}
-			else
-			{
-				return ReverseSpanEnumerator<Entity>.Empty;
-			}
-		}
+	public Entity OutFirst(Entity Entity)
+	{
+		return OutNth(Entity, 0);
+	}
 
-		public Entity OutFirst(int entityID)
-		{
-			return OutNth(entityID, 0);
-		}
-
-		public Entity OutNth(int entityID, int n)
-		{
+	public Entity OutNth(Entity Entity, int n)
+	{
 #if DEBUG
-			if (!outRelations.ContainsKey(entityID) || outRelations[entityID].Count == 0)
-			{
-				throw new KeyNotFoundException("No out relations to this entity!");
-			}
+		if (!OutRelationSets.ContainsKey(Entity) || OutRelationSets[Entity].Count == 0)
+		{
+			throw new KeyNotFoundException("No out relations to this entity!");
+		}
 #endif
-			return outRelations[entityID][n];
-		}
+		return OutRelationSets[Entity][n];
+	}
 
-		public bool HasOutRelation(int entityID)
-		{
-			return outRelations.ContainsKey(entityID) && outRelations[entityID].Count > 0;
-		}
+	public bool HasOutRelation(Entity Entity)
+	{
+		return OutRelationSets.ContainsKey(Entity) && OutRelationSets[Entity].Count > 0;
+	}
 
-		public int OutRelationCount(int entityID)
-		{
-			return outRelations.TryGetValue(entityID, out var entityOutRelations) ? entityOutRelations.Count : 0;
-		}
+	public int OutRelationCount(Entity Entity)
+	{
+		return OutRelationSets.TryGetValue(Entity, out var entityOutRelations) ? entityOutRelations.Count : 0;
+	}
 
-		public ReverseSpanEnumerator<Entity> InRelations(int entityID)
+	public ReverseSpanEnumerator<Entity> InRelations(Entity Entity)
+	{
+		if (InRelationSets.TryGetValue(Entity, out var entityInRelations))
 		{
-			if (inRelations.TryGetValue(entityID, out var entityInRelations))
-			{
-				return entityInRelations.GetEnumerator();
-			}
-			else
-			{
-				return ReverseSpanEnumerator<Entity>.Empty;
-			}
+			return entityInRelations.GetEnumerator();
 		}
-
-		public Entity InFirst(int entityID)
+		else
 		{
-			return InNth(entityID, 0);
+			return ReverseSpanEnumerator<Entity>.Empty;
 		}
+	}
 
-		public Entity InNth(int entityID, int n)
-		{
+	public Entity InFirst(Entity Entity)
+	{
+		return InNth(Entity, 0);
+	}
+
+	public Entity InNth(Entity Entity, int n)
+	{
 #if DEBUG
-			if (!inRelations.ContainsKey(entityID) || inRelations[entityID].Count == 0)
-			{
-				throw new KeyNotFoundException("No in relations to this entity!");
-			}
+		if (!InRelationSets.ContainsKey(Entity) || InRelationSets[Entity].Count == 0)
+		{
+			throw new KeyNotFoundException("No in relations to this entity!");
+		}
 #endif
 
-			return inRelations[entityID][n];
-		}
+		return InRelationSets[Entity][n];
+	}
 
-		public bool HasInRelation(int entityID)
+	public bool HasInRelation(Entity Entity)
+	{
+		return InRelationSets.ContainsKey(Entity) && InRelationSets[Entity].Count > 0;
+	}
+
+	public int InRelationCount(Entity Entity)
+	{
+		return InRelationSets.TryGetValue(Entity, out var entityInRelations) ? entityInRelations.Count : 0;
+	}
+
+	public (bool, bool) Remove(in Entity entityA, in Entity entityB)
+	{
+		var aEmpty = false;
+		var bEmpty = false;
+		var relation = (entityA, entityB);
+
+		if (OutRelationSets.TryGetValue(entityA, out var entityOutRelations))
 		{
-			return inRelations.ContainsKey(entityID) && inRelations[entityID].Count > 0;
-		}
-
-		public int InRelationCount(int entityID)
-		{
-			return inRelations.TryGetValue(entityID, out var entityInRelations) ? entityInRelations.Count : 0;
-		}
-
-		public (bool, bool) Remove(in Entity entityA, in Entity entityB)
-		{
-			var aEmpty = false;
-			var bEmpty = false;
-			var relation = (entityA, entityB);
-
-			if (outRelations.TryGetValue(entityA.ID, out var entityOutRelations))
+			entityOutRelations.Remove(entityB);
+			if (OutRelationSets[entityA].Count == 0)
 			{
-				entityOutRelations.Remove(entityB.ID);
-				if (outRelations[entityA.ID].Count == 0)
+				aEmpty = true;
+			}
+		}
+
+		if (InRelationSets.TryGetValue(entityB, out var entityInRelations))
+		{
+			entityInRelations.Remove(entityA);
+			if (InRelationSets[entityB].Count == 0)
+			{
+				bEmpty = true;
+			}
+		}
+
+		if (Indices.TryGetValue(relation, out var index))
+		{
+			var lastElementIndex = Relations.Count - 1;
+
+			// move an element into the hole
+			if (index != lastElementIndex)
+			{
+				var lastRelation = Relations.Get<(Entity, Entity)>(lastElementIndex);
+				Indices[lastRelation] = index;
+			}
+
+			RelationDatas.Delete(index);
+			Relations.Delete(index);
+
+			Indices.Remove(relation);
+		}
+
+		return (aEmpty, bEmpty);
+	}
+
+	public void RemoveEntity(in Entity entity)
+	{
+		if (OutRelationSets.TryGetValue(entity, out var entityOutRelations))
+		{
+			foreach (var entityB in entityOutRelations)
+			{
+				Remove(entity, entityB);
+			}
+
+			ReturnHashSetToPool(entityOutRelations);
+			OutRelationSets.Remove(entity);
+		}
+
+		if (InRelationSets.TryGetValue(entity, out var entityInRelations))
+		{
+			foreach (var entityA in entityInRelations)
+			{
+				Remove(entityA, entity);
+			}
+
+			ReturnHashSetToPool(entityInRelations);
+			InRelationSets.Remove(entity);
+		}
+	}
+
+	internal IndexableSet<Entity> AcquireHashSetFromPool()
+	{
+		if (ListPool.Count == 0)
+		{
+			ListPool.Push(new IndexableSet<Entity>());
+		}
+
+		return ListPool.Pop();
+	}
+
+	private void ReturnHashSetToPool(IndexableSet<Entity> hashSet)
+	{
+		hashSet.Clear();
+		ListPool.Push(hashSet);
+	}
+
+	public void Clear()
+	{
+		Indices.Clear();
+
+		foreach (var set in InRelationSets.Values)
+		{
+			ReturnHashSetToPool(set);
+		}
+		InRelationSets.Clear();
+
+		foreach (var set in OutRelationSets.Values)
+		{
+			ReturnHashSetToPool(set);
+		}
+		OutRelationSets.Clear();
+
+		Relations.Clear();
+		RelationDatas.Clear();
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!IsDisposed)
+		{
+			Clear();
+
+			if (disposing)
+			{
+				foreach (var set in ListPool)
 				{
-					aEmpty = true;
-				}
-			}
-
-			if (inRelations.TryGetValue(entityB.ID, out var entityInRelations))
-			{
-				entityInRelations.Remove(entityA.ID);
-				if (inRelations[entityB.ID].Count == 0)
-				{
-					bEmpty = true;
-				}
-			}
-
-			if (indices.TryGetValue(relation, out var index))
-			{
-				var lastElementIndex = count - 1;
-
-				// move an element into the hole
-				if (index != lastElementIndex)
-				{
-					var lastRelation = relations[lastElementIndex];
-					indices[lastRelation] = index;
-					relationDatas[index] = relationDatas[lastElementIndex];
-					relations[index] = lastRelation;
-				}
-
-				count -= 1;
-				indices.Remove(relation);
-			}
-
-			return (aEmpty, bEmpty);
-		}
-
-		private IndexableSet<Entity> AcquireHashSetFromPool()
-		{
-			if (listPool.Count == 0)
-			{
-				listPool.Push(new IndexableSet<Entity>());
-			}
-
-			return listPool.Pop();
-		}
-
-		private void ReturnHashSetToPool(IndexableSet<Entity> hashSet)
-		{
-			hashSet.Clear();
-			listPool.Push(hashSet);
-		}
-
-		// untyped methods used for internal implementation
-
-		public override unsafe void Set(int entityA, int entityB, void* relationData)
-		{
-			Set(entityA, entityB, *(TRelation*) relationData);
-		}
-
-		public override int GetStorageIndex(int entityA, int entityB)
-		{
-			return indices[(entityA, entityB)];
-		}
-
-		public override unsafe void* Get(int relationStorageIndex)
-		{
-			return &relationDatas[relationStorageIndex];
-		}
-
-		public override void UnrelateAll(int entityID)
-		{
-			if (outRelations.TryGetValue(entityID, out var entityOutRelations))
-			{
-				foreach (var entityB in entityOutRelations)
-				{
-					Remove(entityID, entityB);
-				}
-
-				ReturnHashSetToPool(entityOutRelations);
-				outRelations.Remove(entityID);
-			}
-
-			if (inRelations.TryGetValue(entityID, out var entityInRelations))
-			{
-				foreach (var entityA in entityInRelations)
-				{
-					Remove(entityA, entityID);
-				}
-
-				ReturnHashSetToPool(entityInRelations);
-				inRelations.Remove(entityID);
-			}
-		}
-
-		public override RelationStorage<TRelation> CreateStorage()
-		{
-			return new RelationStorage<TRelation>();
-		}
-
-		public override void Clear()
-		{
-			count = 0;
-			indices.Clear();
-
-			foreach (var set in inRelations.Values)
-			{
-				ReturnHashSetToPool(set);
-			}
-			inRelations.Clear();
-
-			foreach (var set in outRelations.Values)
-			{
-				ReturnHashSetToPool(set);
-			}
-			outRelations.Clear();
-		}
-
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!disposed)
-			{
-				Clear();
-
-				if (disposing)
-				{
-					foreach (var set in listPool)
-					{
-						set.Dispose();
-					}
+					set.Dispose();
 				}
 
-				NativeMemory.Free(relations);
-				NativeMemory.Free(relationDatas);
-				relations = null;
-				relationDatas = null;
-
-				disposed = true;
+				Relations.Dispose();
+				RelationDatas.Dispose();
 			}
-		}
 
-		~RelationStorage()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: false);
+			IsDisposed = true;
 		}
+	}
 
-		public void Dispose()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: true);
-			GC.SuppressFinalize(this);
-		}
+	// ~RelationStorage()
+	// {
+	// 	// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+	// 	Dispose(disposing: false);
+	// }
+
+	public void Dispose()
+	{
+		// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

@@ -1,182 +1,140 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+using MoonTools.ECS.Collections;
 
-namespace MoonTools.ECS
+namespace MoonTools.ECS;
+
+internal class ComponentStorage : IDisposable
 {
-	internal abstract class ComponentStorage
-	{
-		internal abstract unsafe void Set(int entityID, void* component);
-		public abstract bool Remove(int entityID);
-		public abstract void Clear();
+	internal readonly Dictionary<Entity, int> EntityIDToStorageIndex = new Dictionary<Entity, int>(16);
+	internal readonly NativeArray Components;
+	internal readonly NativeArray<Entity> EntityIDs;
+	internal readonly TypeId TypeId;
 
-		// used for debugging and template instantiation
-		internal abstract unsafe void* UntypedGet(int entityID);
-		// used to create correctly typed storage on snapshot
-		public abstract ComponentStorage CreateStorage();
-#if DEBUG
-		internal abstract object Debug_Get(int entityID);
-		internal abstract IEnumerable<int> Debug_GetEntityIDs();
-#endif
+	private bool IsDisposed;
+
+	public ComponentStorage(TypeId typeId, int elementSize)
+	{
+		Components = new NativeArray(elementSize);
+		EntityIDs = new NativeArray<Entity>();
+		TypeId = typeId;
 	}
 
-	internal unsafe class ComponentStorage<TComponent> : ComponentStorage, IDisposable where TComponent : unmanaged
+	public bool Any()
 	{
-		private readonly Dictionary<int, int> entityIDToStorageIndex = new Dictionary<int, int>(16);
-		private TComponent* components;
-		private int* entityIDs;
-		private int count = 0;
-		private int capacity = 16;
-		private bool disposed;
+		return Components.Count > 0;
+	}
 
-		public ComponentStorage()
-		{
-			components = (TComponent*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<TComponent>()));
-			entityIDs = (int*) NativeMemory.Alloc((nuint) (capacity * Unsafe.SizeOf<int>()));
-		}
+	public bool Has(Entity entity)
+	{
+		return EntityIDToStorageIndex.ContainsKey(entity);
+	}
 
-		public bool Any()
-		{
-			return count > 0;
-		}
+	public ref T Get<T>(in Entity entity) where T : unmanaged
+	{
+		return ref Components.Get<T>(EntityIDToStorageIndex[entity]);
+	}
 
-		public ref readonly TComponent Get(int entityID)
-		{
-			return ref components[entityIDToStorageIndex[entityID]];
-		}
-
-		internal override unsafe void* UntypedGet(int entityID)
-		{
-			return &components[entityIDToStorageIndex[entityID]];
-		}
-
-		public ref readonly TComponent GetFirst()
-		{
+	public ref T GetFirst<T>() where T : unmanaged
+	{
 #if DEBUG
-			if (count == 0)
-			{
-				throw new IndexOutOfRangeException("Component storage is empty!");
-			}
+		if (Components.Count == 0)
+		{
+			throw new IndexOutOfRangeException("Component storage is empty!");
+		}
 #endif
-			return ref components[0];
-		}
+		return ref Components.Get<T>(0);
+	}
 
-		public void Set(int entityID, in TComponent component)
+	// Returns true if the entity had this component.
+	public bool Set<T>(in Entity entity, in T component) where T : unmanaged
+	{
+		if (EntityIDToStorageIndex.TryGetValue(entity, out var index))
 		{
-			if (!entityIDToStorageIndex.ContainsKey(entityID))
-			{
-				var index = count;
-				count += 1;
-
-				if (index >= capacity)
-				{
-					capacity *= 2;
-					components = (TComponent*) NativeMemory.Realloc(components, (nuint) (capacity * Unsafe.SizeOf<TComponent>()));
-					entityIDs = (int*) NativeMemory.Realloc(entityIDs, (nuint) (capacity * Unsafe.SizeOf<int>()));
-				}
-
-				entityIDToStorageIndex[entityID] = index;
-				entityIDs[index] = entityID;
-			}
-
-			components[entityIDToStorageIndex[entityID]] = component;
+			Components.Set(index, component);
+			return true;
 		}
-
-		internal override unsafe void Set(int entityID, void* component)
+		else
 		{
-			Set(entityID, *(TComponent*) component);
-		}
-
-		// Returns true if the entity had this component.
-		public override bool Remove(int entityID)
-		{
-			if (entityIDToStorageIndex.TryGetValue(entityID, out int storageIndex))
-			{
-				entityIDToStorageIndex.Remove(entityID);
-
-				var lastElementIndex = count - 1;
-
-				// move a component into the hole to maintain contiguous memory
-				if (lastElementIndex != storageIndex)
-				{
-					var lastEntityID = entityIDs[lastElementIndex];
-					entityIDToStorageIndex[lastEntityID] = storageIndex;
-					components[storageIndex] = components[lastElementIndex];
-					entityIDs[storageIndex] = lastEntityID;
-				}
-
-				count -= 1;
-
-				return true;
-			}
-
+			EntityIDToStorageIndex[entity] = Components.Count;
+			EntityIDs.Append(entity);
+			Components.Append(component);
 			return false;
 		}
+	}
 
-		public override void Clear()
+	// Returns true if the entity had this component.
+	public bool Remove(in Entity entity)
+	{
+		if (EntityIDToStorageIndex.TryGetValue(entity, out int index))
 		{
-			count = 0;
-			entityIDToStorageIndex.Clear();
-		}
+			var lastElementIndex = Components.Count - 1;
 
-		public ReadOnlySpan<TComponent> AllComponents()
-		{
-			return new ReadOnlySpan<TComponent>(components, count);
-		}
+			var lastEntity = EntityIDs[lastElementIndex];
 
-		public Entity FirstEntity()
-		{
-#if DEBUG
-			if (count == 0)
+			// move a component into the hole to maintain contiguous memory
+			Components.Delete(index);
+			EntityIDs.Delete(index);
+			EntityIDToStorageIndex.Remove(entity);
+
+			// update the index if it changed
+			if (lastElementIndex != index)
 			{
-				throw new IndexOutOfRangeException("Component storage is empty!");
+				EntityIDToStorageIndex[lastEntity] = index;
 			}
-#endif
-			return new Entity(entityIDs[0]);
+
+			return true;
 		}
 
-		public override ComponentStorage<TComponent> CreateStorage()
-		{
-			return new ComponentStorage<TComponent>();
-		}
+		return false;
+	}
 
+	public void Clear()
+	{
+		Components.Clear();
+		EntityIDs.Clear();
+		EntityIDToStorageIndex.Clear();
+	}
+
+	public Entity FirstEntity()
+	{
 #if DEBUG
-		internal override object Debug_Get(int entityID)
+		if (EntityIDs.Count == 0)
 		{
-			return components[entityIDToStorageIndex[entityID]];
-		}
-
-		internal override IEnumerable<int> Debug_GetEntityIDs()
-		{
-			return entityIDToStorageIndex.Keys;
-		}
-
-		protected virtual void Dispose(bool disposing)
-		{
-			if (!disposed)
-			{
-				NativeMemory.Free(components);
-				NativeMemory.Free(entityIDs);
-				components = null;
-				entityIDs = null;
-
-				disposed = true;
-			}
-		}
-
-		~ComponentStorage()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: false);
-		}
-
-		public void Dispose()
-		{
-			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-			Dispose(disposing: true);
-			GC.SuppressFinalize(this);
+			throw new IndexOutOfRangeException("Component storage is empty!");
 		}
 #endif
+		return EntityIDs[0];
+	}
+
+#if DEBUG
+	internal IEnumerable<Entity> Debug_GetEntities()
+	{
+		return EntityIDToStorageIndex.Keys;
+	}
+#endif
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!IsDisposed)
+		{
+			Components.Dispose();
+			EntityIDs.Dispose();
+
+			IsDisposed = true;
+		}
+	}
+
+	// ~ComponentStorage()
+	// {
+	// 	// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+	// 	Dispose(disposing: false);
+	// }
+
+	public void Dispose()
+	{
+		// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

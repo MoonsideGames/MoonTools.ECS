@@ -8,12 +8,12 @@ namespace MoonTools.ECS;
 // TODO: we should implement a NativeDictionary that can be memcopied
 public class Snapshot : IDisposable
 {
-	private Dictionary<TypeId, ComponentSnapshot> ComponentSnapshots = new Dictionary<TypeId, ComponentSnapshot>();
+	private List<ComponentSnapshot> ComponentSnapshots = new List<ComponentSnapshot>();
 
+	// FIXME: we could just have a filter ID
 	private Dictionary<FilterSignature, List<Entity>> Filters = new Dictionary<FilterSignature, List<Entity>>();
 
-	private Dictionary<TypeId, RelationSnapshot> RelationSnapshots =
-		new Dictionary<TypeId, RelationSnapshot>();
+	private List<RelationSnapshot> RelationSnapshots = new List<RelationSnapshot>();
 
 	private Dictionary<Entity, IndexableSet<TypeId>> EntityRelationIndex =
 		new Dictionary<Entity, IndexableSet<TypeId>>();
@@ -21,7 +21,7 @@ public class Snapshot : IDisposable
 	private Dictionary<Entity, IndexableSet<TypeId>> EntityComponentIndex =
 		new Dictionary<Entity, IndexableSet<TypeId>>();
 
-	private Dictionary<Entity, string> EntityTags = new Dictionary<Entity, string>();
+	private List<string> EntityTags = new List<string>();
 
 	private IdAssigner EntityIdAssigner = new IdAssigner();
 
@@ -48,30 +48,29 @@ public class Snapshot : IDisposable
 
 		// clear all component storages in case any were created after snapshot
 		// FIXME: this can be eliminated via component discovery
-		foreach (var (typeId, componentStorage) in world.ComponentIndex)
+		foreach (var componentStorage in world.ComponentIndex)
 		{
 			componentStorage.Clear();
 		}
 
 		// clear all relation storages in case any were created after snapshot
 		// FIXME: this can be eliminated via component discovery
-		foreach (var (typeId, relationStorage) in world.RelationIndex)
+		foreach (var relationStorage in world.RelationIndex)
 		{
 			relationStorage.Clear();
 		}
 
-		// restore components
-		foreach (var (typeId, componentSnapshot) in ComponentSnapshots)
+		for (var i = 0; i < world.ComponentIndex.Count; i += 1)
 		{
-			var componentStorage = world.ComponentIndex[typeId];
-			componentSnapshot.Restore(componentStorage);
+			var componentStorage = world.ComponentIndex[i];
+			ComponentSnapshots[i].Restore(componentStorage);
 		}
 
 		// restore relation state
-		foreach (var (typeId, relationSnapshot) in RelationSnapshots)
+		for (var i = 0; i < RelationSnapshots.Count; i += 1)
 		{
-			var relationStorage = world.RelationIndex[typeId];
-			relationSnapshot.Restore(relationStorage);
+			var relationStorage = world.RelationIndex[i];
+			RelationSnapshots[i].Restore(relationStorage);
 		}
 
 		// restore entity relation index state
@@ -107,9 +106,10 @@ public class Snapshot : IDisposable
 		}
 
 		// restore entity tags
-		foreach (var (id, s) in EntityTags)
+		world.EntityTags.Clear();
+		foreach (var s in EntityTags)
 		{
-			world.EntityTags[id] = s;
+			world.EntityTags.Add(s);
 		}
 	}
 
@@ -125,15 +125,25 @@ public class Snapshot : IDisposable
 		}
 
 		// copy components
-		foreach (var (typeId, componentStorage) in world.ComponentIndex)
+		for (var i = ComponentSnapshots.Count; i < world.ComponentIndex.Count; i += 1)
 		{
-			TakeComponentSnapshot(typeId, componentStorage);
+			ComponentSnapshots.Add(new ComponentSnapshot(world.ComponentIndex[i].ElementSize));
+		}
+
+		for (var i = 0; i < world.ComponentIndex.Count; i += 1)
+		{
+			ComponentSnapshots[i].Take(world.ComponentIndex[i]);
 		}
 
 		// copy relations
-		foreach (var (typeId, relationStorage) in world.RelationIndex)
+		for (var i = RelationSnapshots.Count; i < world.RelationIndex.Count; i += 1)
 		{
-			TakeRelationSnapshot(typeId, relationStorage);
+			RelationSnapshots.Add(new RelationSnapshot(world.RelationIndex[i].ElementSize));
+		}
+
+		for (var i = 0; i < world.RelationIndex.Count; i += 1)
+		{
+			RelationSnapshots[i].Take(world.RelationIndex[i]);
 		}
 
 		// copy entity relation index
@@ -171,9 +181,10 @@ public class Snapshot : IDisposable
 		}
 
 		// copy entity tags
-		foreach (var (id, s) in world.EntityTags)
+		EntityTags.Clear();
+		foreach (var s in world.EntityTags)
 		{
-			EntityTags[id] = s;
+			EntityTags.Add(s);
 		}
 	}
 
@@ -191,28 +202,6 @@ public class Snapshot : IDisposable
 		{
 			entities.Add(entity);
 		}
-	}
-
-	private void TakeComponentSnapshot(TypeId typeId, ComponentStorage componentStorage)
-	{
-		if (!ComponentSnapshots.TryGetValue(typeId, out var componentSnapshot))
-		{
-			componentSnapshot = new ComponentSnapshot(componentStorage.Components.ElementSize);
-			ComponentSnapshots.Add(typeId, componentSnapshot);
-		}
-
-		componentSnapshot.Take(componentStorage);
-	}
-
-	private void TakeRelationSnapshot(TypeId typeId, RelationStorage relationStorage)
-	{
-		if (!RelationSnapshots.TryGetValue(typeId, out var snapshot))
-		{
-			snapshot = new RelationSnapshot(relationStorage.RelationDatas.ElementSize);
-			RelationSnapshots.Add(typeId, snapshot);
-		}
-
-		snapshot.Take(relationStorage);
 	}
 
 	private class ComponentSnapshot : IDisposable
@@ -348,12 +337,12 @@ public class Snapshot : IDisposable
 		{
 			if (disposing)
 			{
-				foreach (var componentSnapshot in ComponentSnapshots.Values)
+				foreach (var componentSnapshot in ComponentSnapshots)
 				{
 					componentSnapshot.Dispose();
 				}
 
-				foreach (var relationSnapshot in RelationSnapshots.Values)
+				foreach (var relationSnapshot in RelationSnapshots)
 				{
 					relationSnapshot.Dispose();
 				}

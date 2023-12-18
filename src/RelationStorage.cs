@@ -10,6 +10,7 @@ internal class RelationStorage
 {
 	internal NativeArray Relations;
 	internal NativeArray RelationDatas;
+	internal int ElementSize;
 	internal Dictionary<(Entity, Entity), int> Indices = new Dictionary<(Entity, Entity), int>(16);
 	internal Dictionary<Entity, IndexableSet<Entity>> OutRelationSets = new Dictionary<Entity, IndexableSet<Entity>>(16);
 	internal Dictionary<Entity, IndexableSet<Entity>> InRelationSets = new Dictionary<Entity, IndexableSet<Entity>>(16);
@@ -19,6 +20,7 @@ internal class RelationStorage
 
 	public RelationStorage(int relationDataSize)
 	{
+		ElementSize = relationDataSize;
 		Relations = new NativeArray(Unsafe.SizeOf<(Entity, Entity)>());
 		RelationDatas = new NativeArray(relationDataSize);
 	}

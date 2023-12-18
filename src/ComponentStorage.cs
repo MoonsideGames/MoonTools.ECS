@@ -10,11 +10,13 @@ internal class ComponentStorage : IDisposable
 	internal readonly NativeArray Components;
 	internal readonly NativeArray<Entity> EntityIDs;
 	internal readonly TypeId TypeId;
+	internal readonly int ElementSize;
 
 	private bool IsDisposed;
 
 	public ComponentStorage(TypeId typeId, int elementSize)
 	{
+		ElementSize = elementSize;
 		Components = new NativeArray(elementSize);
 		EntityIDs = new NativeArray<Entity>();
 		TypeId = typeId;

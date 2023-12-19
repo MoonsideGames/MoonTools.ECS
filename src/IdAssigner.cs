@@ -5,12 +5,12 @@ namespace MoonTools.ECS;
 
 internal class IdAssigner : IDisposable
 {
-	uint Next;
-	NativeArray<uint> AvailableIds = new NativeArray<uint>();
+	int Next = 0;
+	NativeArray<int> AvailableIds = new NativeArray<int>();
 
 	private bool IsDisposed;
 
-	public uint Assign()
+	public int Assign()
 	{
 		if (AvailableIds.TryPop(out var id))
 		{
@@ -22,7 +22,7 @@ internal class IdAssigner : IDisposable
 		return id;
 	}
 
-	public void Unassign(uint id)
+	public void Unassign(int id)
 	{
 		AvailableIds.Append(id);
 	}
@@ -45,13 +45,6 @@ internal class IdAssigner : IDisposable
 			IsDisposed = true;
 		}
 	}
-
-	// // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-	// ~IdAssigner()
-	// {
-	//     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-	//     Dispose(disposing: false);
-	// }
 
 	public void Dispose()
 	{

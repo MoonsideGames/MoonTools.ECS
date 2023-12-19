@@ -7,8 +7,8 @@ namespace MoonTools.ECS.Collections;
 internal unsafe class NativeArray : IDisposable
 {
 	private nint Elements;
-	public int Count { get; private set;}
-	private int Capacity;
+	public int Count { get; private set; }
+	public int Capacity { get; private set; }
 	public readonly int ElementSize;
 
 	private bool IsDisposed;
@@ -44,7 +44,7 @@ internal unsafe class NativeArray : IDisposable
 		Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
 	}
 
-	private void ResizeTo(int capacity)
+	public void ResizeTo(int capacity)
 	{
 		Capacity = capacity;
 		Elements = (nint) NativeMemory.Realloc((void*) Elements, (nuint) (ElementSize * Capacity));
@@ -62,6 +62,11 @@ internal unsafe class NativeArray : IDisposable
 			);
 		}
 
+		Count -= 1;
+	}
+
+	public void RemoveLastElement()
+	{
 		Count -= 1;
 	}
 

@@ -51,8 +51,7 @@ public class World : IDisposable
 		// add missing storages, it's possible for there to be multiples in multi-world scenarios
 		for (var i = ComponentIndex.Count; i <= typeId; i += 1)
 		{
-			var missingTypeId = new TypeId((uint) i);
-			var componentStorage = new ComponentStorage(missingTypeId, ComponentTypeElementSizes[i]);
+			var componentStorage = new ComponentStorage(ComponentTypeElementSizes[i]);
 			ComponentIndex.Add(componentStorage);
 			ComponentTypeToFilter.Add(new List<Filter>());
 		}
@@ -149,8 +148,7 @@ public class World : IDisposable
 
 	public bool Has<T>(in Entity entity) where T : unmanaged
 	{
-		var storage = GetComponentStorage<T>();
-		return storage.Has(entity);
+		return EntityComponentIndex[entity].Contains(new TypeId(ComponentTypeIdAssigner<T>.Id));
 	}
 
 	internal bool Has(in Entity entity, in TypeId typeId)
@@ -185,12 +183,13 @@ public class World : IDisposable
 	public void Set<T>(in Entity entity, in T component) where T : unmanaged
 	{
 		var componentStorage = GetComponentStorage<T>();
+		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
 
 		if (!componentStorage.Set(entity, component))
 		{
-			EntityComponentIndex[entity].Add(componentStorage.TypeId);
+			EntityComponentIndex[entity].Add(typeId);
 
-			foreach (var filter in ComponentTypeToFilter[componentStorage.TypeId])
+			foreach (var filter in ComponentTypeToFilter[typeId])
 			{
 				filter.Check(entity);
 			}
@@ -200,12 +199,13 @@ public class World : IDisposable
 	public void Remove<T>(in Entity entity) where T : unmanaged
 	{
 		var componentStorage = GetComponentStorage<T>();
+		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
 
 		if (componentStorage.Remove(entity))
 		{
-			EntityComponentIndex[entity].Remove(componentStorage.TypeId);
+			EntityComponentIndex[entity].Remove(typeId);
 
-			foreach (var filter in ComponentTypeToFilter[componentStorage.TypeId])
+			foreach (var filter in ComponentTypeToFilter[typeId])
 			{
 				filter.Check(entity);
 			}
@@ -391,7 +391,7 @@ public class World : IDisposable
 		return new ComponentTypeEnumerator(this, EntityComponentIndex[entity]);
 	}
 
-	public IEnumerable<Entity> Debug_GetEntities(Type componentType)
+	public Span<Entity> Debug_GetEntities(Type componentType)
 	{
 		var storage = ComponentIndex[ComponentTypeToId[componentType]];
 		return storage.Debug_GetEntities();

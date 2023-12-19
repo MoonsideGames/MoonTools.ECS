@@ -206,34 +206,31 @@ public class Snapshot : IDisposable
 
 	private class ComponentSnapshot : IDisposable
 	{
-		private readonly NativeArray Components;
-		private readonly NativeArray<Entity> EntityIDs;
+		private readonly NativeArray<Entity> DenseArray = new NativeArray<Entity>();
+		private readonly NativeArray<Entity> SparseArray = new NativeArray<Entity>();
+		private readonly NativeArray ElementArray;
 
 		private bool IsDisposed;
 
 		public ComponentSnapshot(int elementSize)
 		{
-			Components = new NativeArray(elementSize);
-			EntityIDs = new NativeArray<Entity>();
+			ElementArray = new NativeArray(elementSize);
+			DenseArray = new NativeArray<Entity>(elementSize);
+			SparseArray = new NativeArray<Entity>(elementSize);
 		}
 
 		public void Take(ComponentStorage componentStorage)
 		{
-			componentStorage.Components.CopyAllTo(Components);
-			componentStorage.EntityIDs.CopyTo(EntityIDs);
+			componentStorage.DenseArray.CopyTo(DenseArray);
+			componentStorage.SparseArray.CopyTo(SparseArray);
+			componentStorage.ElementArray.CopyAllTo(ElementArray);
 		}
 
 		public void Restore(ComponentStorage componentStorage)
 		{
-			Components.CopyAllTo(componentStorage.Components);
-			EntityIDs.CopyTo(componentStorage.EntityIDs);
-
-			componentStorage.EntityIDToStorageIndex.Clear();
-			for (int i = 0; i < EntityIDs.Count; i += 1)
-			{
-				var entityID = EntityIDs[i];
-				componentStorage.EntityIDToStorageIndex[entityID] = i;
-			}
+			DenseArray.CopyTo(componentStorage.DenseArray);
+			SparseArray.CopyTo(componentStorage.SparseArray);
+			ElementArray.CopyAllTo(componentStorage.ElementArray);
 		}
 
 		protected virtual void Dispose(bool disposing)
@@ -242,8 +239,9 @@ public class Snapshot : IDisposable
 			{
 				if (disposing)
 				{
-					Components.Dispose();
-					EntityIDs.Dispose();
+					DenseArray.Dispose();
+					SparseArray.Dispose();
+					ElementArray.Dispose();
 				}
 
 				IsDisposed = true;

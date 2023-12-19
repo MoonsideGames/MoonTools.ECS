@@ -1,89 +1,97 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS;
 
-internal class ComponentStorage : IDisposable
+public class ComponentStorage : IDisposable
 {
-	internal readonly Dictionary<Entity, int> EntityIDToStorageIndex = new Dictionary<Entity, int>(16);
-	internal readonly NativeArray Components;
-	internal readonly NativeArray<Entity> EntityIDs;
-	internal readonly TypeId TypeId;
-	internal readonly int ElementSize;
-
+	internal readonly NativeArray<Entity> DenseArray = new NativeArray<Entity>();
+	internal readonly NativeArray<Entity> SparseArray = new NativeArray<Entity>();
+	internal readonly NativeArray ElementArray;
 	private bool IsDisposed;
 
-	public ComponentStorage(TypeId typeId, int elementSize)
+	public int ElementSize { get; private set; }
+	public int Count => DenseArray.Count;
+
+	public ComponentStorage(int elementSize)
 	{
+		for (var i = 0; i < 16; i += 1)
+		{
+			SparseArray.Append(Entity.Null); // sentinel value
+		}
+
+		ElementArray = new NativeArray(elementSize);
 		ElementSize = elementSize;
-		Components = new NativeArray(elementSize);
-		EntityIDs = new NativeArray<Entity>();
-		TypeId = typeId;
 	}
 
-	public bool Any()
-	{
-		return Components.Count > 0;
-	}
+	public bool Any() => DenseArray.Count > 0;
 
-	public bool Has(Entity entity)
+	public ref T Get<T>(Entity entity) where T : unmanaged
 	{
-		return EntityIDToStorageIndex.ContainsKey(entity);
-	}
-
-	public ref T Get<T>(in Entity entity) where T : unmanaged
-	{
-		return ref Components.Get<T>(EntityIDToStorageIndex[entity]);
+		if (entity.ID >= ElementArray.Capacity)
+		{
+			throw new Exception("oh noes");
+		}
+		return ref ElementArray.Get<T>(entity.ID);
 	}
 
 	public ref T GetFirst<T>() where T : unmanaged
 	{
 #if DEBUG
-		if (Components.Count == 0)
+		if (DenseArray.Count == 0)
 		{
 			throw new IndexOutOfRangeException("Component storage is empty!");
 		}
 #endif
-		return ref Components.Get<T>(0);
+		return ref ElementArray.Get<T>(DenseArray[0].ID);
 	}
 
-	// Returns true if the entity had this component.
-	public bool Set<T>(in Entity entity, in T component) where T : unmanaged
+	public bool Set<T>(Entity entity, T component) where T : unmanaged
 	{
-		if (EntityIDToStorageIndex.TryGetValue(entity, out var index))
+		var newEntity = SparseArray[entity.ID] == Entity.Null;
+		if (newEntity)
 		{
-			Components.Set(index, component);
-			return true;
-		}
-		else
-		{
-			EntityIDToStorageIndex[entity] = Components.Count;
-			EntityIDs.Append(entity);
-			Components.Append(component);
-			return false;
-		}
-	}
-
-	// Returns true if the entity had this component.
-	public bool Remove(in Entity entity)
-	{
-		if (EntityIDToStorageIndex.TryGetValue(entity, out int index))
-		{
-			var lastElementIndex = Components.Count - 1;
-
-			var lastEntity = EntityIDs[lastElementIndex];
-
-			// move a component into the hole to maintain contiguous memory
-			Components.Delete(index);
-			EntityIDs.Delete(index);
-			EntityIDToStorageIndex.Remove(entity);
-
-			// update the index if it changed
-			if (lastElementIndex != index)
+			// the entity is being added! let's do some record keeping
+			var index = DenseArray.Count;
+			DenseArray.Append(entity);
+			if (entity.ID >= SparseArray.Count)
 			{
-				EntityIDToStorageIndex[lastEntity] = index;
+				var oldCount = SparseArray.Count;
+				SparseArray.ResizeTo(entity.ID + 1);
+				for (var i = oldCount; i < SparseArray.Count; i += 1)
+				{
+					SparseArray.Append(Entity.Null); // sentinel value
+				}
 			}
+			SparseArray[entity.ID] = entity;
+
+			// FIXME: something is not right here
+			if (entity.ID >= ElementArray.Count)
+			{
+				ElementArray.ResizeTo(entity.ID + 1);
+			}
+		}
+
+		ElementArray.Set(entity.ID, component);
+		return !newEntity;
+	}
+
+	public bool Has(Entity entity)
+	{
+		return SparseArray[entity.ID] != Entity.Null;
+	}
+
+	public bool Remove(Entity entity)
+	{
+		if (Has(entity))
+		{
+			var denseIndex = SparseArray[entity.ID];
+			var lastItem = DenseArray[DenseArray.Count - 1];
+		 	DenseArray[denseIndex.ID] = lastItem;
+			SparseArray[lastItem.ID] = denseIndex;
+			SparseArray[entity.ID] = Entity.Null; // sentinel value
+			DenseArray.RemoveLastElement();
+			ElementArray.RemoveLastElement();
 
 			return true;
 		}
@@ -93,26 +101,29 @@ internal class ComponentStorage : IDisposable
 
 	public void Clear()
 	{
-		Components.Clear();
-		EntityIDs.Clear();
-		EntityIDToStorageIndex.Clear();
+		DenseArray.Clear();
+		ElementArray.Clear();
+		for (var i = 0; i < SparseArray.Count; i += 1)
+		{
+			SparseArray[i] = Entity.Null;
+		}
 	}
 
 	public Entity FirstEntity()
 	{
 #if DEBUG
-		if (EntityIDs.Count == 0)
+		if (DenseArray.Count == 0)
 		{
 			throw new IndexOutOfRangeException("Component storage is empty!");
 		}
 #endif
-		return EntityIDs[0];
+		return DenseArray[0];
 	}
 
 #if DEBUG
-	internal IEnumerable<Entity> Debug_GetEntities()
+	internal Span<Entity> Debug_GetEntities()
 	{
-		return EntityIDToStorageIndex.Keys;
+		return DenseArray.ToSpan();
 	}
 #endif
 
@@ -120,18 +131,16 @@ internal class ComponentStorage : IDisposable
 	{
 		if (!IsDisposed)
 		{
-			Components.Dispose();
-			EntityIDs.Dispose();
+			if (disposing)
+			{
+				DenseArray.Dispose();
+				SparseArray.Dispose();
+				ElementArray.Dispose();
+			}
 
 			IsDisposed = true;
 		}
 	}
-
-	// ~ComponentStorage()
-	// {
-	// 	// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-	// 	Dispose(disposing: false);
-	// }
 
 	public void Dispose()
 	{

@@ -36,6 +36,7 @@ public class ComponentTypeIdAssigner<T> : ComponentTypeIdAssigner
 
 		#if DEBUG
 		World.ComponentTypeToId[typeof(T)] = new TypeId(Id);
+		World.ComponentTypeIdToType.Add(typeof(T));
 		#endif
 	}
 }

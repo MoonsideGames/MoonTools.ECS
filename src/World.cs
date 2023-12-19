@@ -148,12 +148,12 @@ public class World : IDisposable
 
 	public bool Has<T>(in Entity entity) where T : unmanaged
 	{
-		return EntityComponentIndex[entity].Contains(new TypeId(ComponentTypeIdAssigner<T>.Id));
+		return GetComponentStorage<T>().Has(entity);
 	}
 
 	internal bool Has(in Entity entity, in TypeId typeId)
 	{
-		return EntityComponentIndex[entity].Contains(typeId);
+		return ComponentIndex[(int) typeId.Value].Has(entity);
 	}
 
 	public bool Some<T>() where T : unmanaged

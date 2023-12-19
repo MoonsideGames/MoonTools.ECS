@@ -1,4 +1,6 @@
 using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS;
@@ -6,36 +8,34 @@ namespace MoonTools.ECS;
 public class ComponentStorage : IDisposable
 {
 	internal readonly NativeArray<Entity> DenseArray = new NativeArray<Entity>();
-	internal readonly NativeArray<Entity> SparseArray = new NativeArray<Entity>();
-	internal readonly NativeArray ElementArray;
+	internal readonly NativeArray<int> SparseArray = new NativeArray<int>();
+	internal nint ElementArray;
+	internal int ElementArrayCapacity;
 	private bool IsDisposed;
 
 	public int ElementSize { get; private set; }
 	public int Count => DenseArray.Count;
 
-	public ComponentStorage(int elementSize)
+	public unsafe ComponentStorage(int elementSize)
 	{
 		for (var i = 0; i < 16; i += 1)
 		{
-			SparseArray.Append(Entity.Null); // sentinel value
+			SparseArray.Append(Entity.Null.ID); // sentinel value
 		}
 
-		ElementArray = new NativeArray(elementSize);
+		ElementArrayCapacity = 16;
+		ElementArray = (nint) NativeMemory.Alloc((nuint) (elementSize * ElementArrayCapacity));
 		ElementSize = elementSize;
 	}
 
 	public bool Any() => DenseArray.Count > 0;
 
-	public ref T Get<T>(Entity entity) where T : unmanaged
+	public unsafe ref T Get<T>(Entity entity) where T : unmanaged
 	{
-		if (entity.ID >= ElementArray.Capacity)
-		{
-			throw new Exception("oh noes");
-		}
-		return ref ElementArray.Get<T>(entity.ID);
+		return ref ((T*) ElementArray)[SparseArray[entity.ID]];
 	}
 
-	public ref T GetFirst<T>() where T : unmanaged
+	public unsafe ref T GetFirst<T>() where T : unmanaged
 	{
 #if DEBUG
 		if (DenseArray.Count == 0)
@@ -43,12 +43,12 @@ public class ComponentStorage : IDisposable
 			throw new IndexOutOfRangeException("Component storage is empty!");
 		}
 #endif
-		return ref ElementArray.Get<T>(DenseArray[0].ID);
+		return ref ((T*) ElementArray)[0];
 	}
 
-	public bool Set<T>(Entity entity, T component) where T : unmanaged
+	public unsafe bool Set<T>(Entity entity, T component) where T : unmanaged
 	{
-		var newEntity = SparseArray[entity.ID] == Entity.Null;
+		var newEntity = entity.ID >= SparseArray.Count || SparseArray[entity.ID] == Entity.Null.ID;
 		if (newEntity)
 		{
 			// the entity is being added! let's do some record keeping
@@ -58,40 +58,47 @@ public class ComponentStorage : IDisposable
 			{
 				var oldCount = SparseArray.Count;
 				SparseArray.ResizeTo(entity.ID + 1);
-				for (var i = oldCount; i < SparseArray.Count; i += 1)
+				for (var i = oldCount; i < SparseArray.Capacity; i += 1)
 				{
-					SparseArray.Append(Entity.Null); // sentinel value
+					SparseArray.Append(Entity.Null.ID); // sentinel value
 				}
 			}
-			SparseArray[entity.ID] = entity;
+			SparseArray[entity.ID] = index;
 
-			// FIXME: something is not right here
-			if (entity.ID >= ElementArray.Count)
+			if (entity.ID >= ElementArrayCapacity)
 			{
-				ElementArray.ResizeTo(entity.ID + 1);
+				ElementArrayCapacity = entity.ID + 1;
+				ElementArray = (nint) NativeMemory.Realloc((void*) ElementArray, (nuint) (ElementArrayCapacity * ElementSize));
 			}
 		}
 
-		ElementArray.Set(entity.ID, component);
+		Unsafe.Write((void*) (ElementArray + ElementSize * SparseArray[entity.ID]), component);
 		return !newEntity;
 	}
 
 	public bool Has(Entity entity)
 	{
-		return SparseArray[entity.ID] != Entity.Null;
+		return entity.ID < SparseArray.Count && SparseArray[entity.ID] != Entity.Null.ID;
 	}
 
-	public bool Remove(Entity entity)
+	public unsafe bool Remove(Entity entity)
 	{
 		if (Has(entity))
 		{
 			var denseIndex = SparseArray[entity.ID];
 			var lastItem = DenseArray[DenseArray.Count - 1];
-		 	DenseArray[denseIndex.ID] = lastItem;
+		 	DenseArray[denseIndex] = lastItem;
 			SparseArray[lastItem.ID] = denseIndex;
-			SparseArray[entity.ID] = Entity.Null; // sentinel value
+			SparseArray[entity.ID] = Entity.Null.ID; // sentinel value
+
+			if (denseIndex != DenseArray.Count - 1)
+			{
+				NativeMemory.Copy((void*) (ElementArray + ElementSize * (DenseArray.Count - 1)), (void*) (ElementArray + ElementSize * denseIndex), (nuint) ElementSize);
+			}
+
 			DenseArray.RemoveLastElement();
-			ElementArray.RemoveLastElement();
+
+
 
 			return true;
 		}
@@ -102,10 +109,9 @@ public class ComponentStorage : IDisposable
 	public void Clear()
 	{
 		DenseArray.Clear();
-		ElementArray.Clear();
-		for (var i = 0; i < SparseArray.Count; i += 1)
+		for (var i = 0; i < SparseArray.Capacity; i += 1)
 		{
-			SparseArray[i] = Entity.Null;
+			SparseArray[i] = Entity.Null.ID;
 		}
 	}
 
@@ -127,7 +133,7 @@ public class ComponentStorage : IDisposable
 	}
 #endif
 
-	protected virtual void Dispose(bool disposing)
+	protected unsafe virtual void Dispose(bool disposing)
 	{
 		if (!IsDisposed)
 		{
@@ -135,8 +141,9 @@ public class ComponentStorage : IDisposable
 			{
 				DenseArray.Dispose();
 				SparseArray.Dispose();
-				ElementArray.Dispose();
 			}
+
+			NativeMemory.Free((void*) ElementArray);
 
 			IsDisposed = true;
 		}

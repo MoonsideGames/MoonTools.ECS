@@ -8,7 +8,7 @@ public unsafe class NativeArray<T> : IDisposable where T : unmanaged
 {
 	private T* Elements;
 	public int Count { get; private set; }
-	private int Capacity;
+	public int Capacity { get; private set; }
 	private int ElementSize;
 
 	public Span<T> ToSpan() => new Span<T>(Elements, Count);

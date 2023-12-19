@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS;
@@ -206,34 +207,40 @@ public class Snapshot : IDisposable
 
 	private class ComponentSnapshot : IDisposable
 	{
-		private readonly NativeArray<Entity> DenseArray = new NativeArray<Entity>();
-		private readonly NativeArray<Entity> SparseArray = new NativeArray<Entity>();
-		private readonly NativeArray ElementArray;
+		private readonly NativeArray<Entity> DenseArray;
+		private readonly NativeArray<int> SparseArray;
+		private nint ElementArray;
+		private int ElementArrayCapacity;
 
 		private bool IsDisposed;
 
-		public ComponentSnapshot(int elementSize)
+		public unsafe ComponentSnapshot(int elementSize)
 		{
-			ElementArray = new NativeArray(elementSize);
+			ElementArray = (nint) NativeMemory.Alloc((nuint) (16 * elementSize));
 			DenseArray = new NativeArray<Entity>(elementSize);
-			SparseArray = new NativeArray<Entity>(elementSize);
+			SparseArray = new NativeArray<int>(elementSize);
 		}
 
-		public void Take(ComponentStorage componentStorage)
+		public unsafe void Take(ComponentStorage componentStorage)
 		{
 			componentStorage.DenseArray.CopyTo(DenseArray);
 			componentStorage.SparseArray.CopyTo(SparseArray);
-			componentStorage.ElementArray.CopyAllTo(ElementArray);
+			if (componentStorage.ElementArrayCapacity > ElementArrayCapacity)
+			{
+				ElementArrayCapacity = componentStorage.ElementArrayCapacity;
+				NativeMemory.Realloc((void*) ElementArray, (nuint) (componentStorage.ElementSize * ElementArrayCapacity));
+			}
+			NativeMemory.Copy((void*) componentStorage.ElementArray, (void*) ElementArray, (nuint) (ElementArrayCapacity * componentStorage.ElementSize));
 		}
 
-		public void Restore(ComponentStorage componentStorage)
+		public unsafe void Restore(ComponentStorage componentStorage)
 		{
 			DenseArray.CopyTo(componentStorage.DenseArray);
 			SparseArray.CopyTo(componentStorage.SparseArray);
-			ElementArray.CopyAllTo(componentStorage.ElementArray);
+			NativeMemory.Copy((void*) ElementArray, (void*) componentStorage.ElementArray, (nuint) (ElementArrayCapacity * componentStorage.ElementSize));
 		}
 
-		protected virtual void Dispose(bool disposing)
+		protected unsafe virtual void Dispose(bool disposing)
 		{
 			if (!IsDisposed)
 			{
@@ -241,8 +248,9 @@ public class Snapshot : IDisposable
 				{
 					DenseArray.Dispose();
 					SparseArray.Dispose();
-					ElementArray.Dispose();
 				}
+
+				NativeMemory.Free((void*) ElementArray);
 
 				IsDisposed = true;
 			}

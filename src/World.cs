@@ -7,85 +7,64 @@ namespace MoonTools.ECS;
 
 public class World : IDisposable
 {
-	// Get TypeId from a Type
-	private readonly Dictionary<Type, TypeId> TypeToId = new Dictionary<Type, TypeId>();
-
 #if DEBUG
-	private Dictionary<TypeId, Type> IdToType = new Dictionary<TypeId, Type>();
+	// TODO: is there a smarter way to do this?
+	internal static Dictionary<Type, TypeId> ComponentTypeToId = new Dictionary<Type, TypeId>();
+	internal static List<Type> ComponentTypeIdToType = new List<Type>();
 #endif
 
-	// Get element size from a TypeId
-	private readonly Dictionary<TypeId, int> ElementSizes = new Dictionary<TypeId, int>();
+	internal static List<int> ComponentTypeElementSizes = new List<int>();
+	internal static List<int> RelationTypeElementSizes = new List<int>();
+	internal static List<int> MessageTypeElementSizes = new List<int>();
 
 	// Filters
 	internal readonly Dictionary<FilterSignature, Filter> FilterIndex = new Dictionary<FilterSignature, Filter>();
-	private readonly Dictionary<TypeId, List<Filter>> TypeToFilter = new Dictionary<TypeId, List<Filter>>();
+	private readonly List<List<Filter>> ComponentTypeToFilter = new List<List<Filter>>();
 
 	// TODO: can we make the tag an native array of chars at some point?
-	internal Dictionary<Entity, string> EntityTags = new Dictionary<Entity, string>();
+	internal List<string> EntityTags = new List<string>();
 
 	// Relation Storages
-	internal Dictionary<TypeId, RelationStorage> RelationIndex = new Dictionary<TypeId, RelationStorage>();
-	internal Dictionary<Entity, IndexableSet<TypeId>> EntityRelationIndex = new Dictionary<Entity, IndexableSet<TypeId>>();
+	internal List<RelationStorage> RelationIndex = new List<RelationStorage>();
+	internal List<IndexableSet<TypeId>> EntityRelationIndex = new List<IndexableSet<TypeId>>();
 
 	// Message Storages
-	private Dictionary<TypeId, MessageStorage> MessageIndex = new Dictionary<TypeId, MessageStorage>();
+	private List<MessageStorage> MessageIndex = new List<MessageStorage>();
 
 	public FilterBuilder FilterBuilder => new FilterBuilder(this);
 
-	internal readonly Dictionary<TypeId, ComponentStorage> ComponentIndex = new Dictionary<TypeId, ComponentStorage>();
-	internal Dictionary<Entity, IndexableSet<TypeId>> EntityComponentIndex = new Dictionary<Entity, IndexableSet<TypeId>>();
+	internal readonly List<ComponentStorage> ComponentIndex = new List<ComponentStorage>();
+	internal List<IndexableSet<TypeId>> EntityComponentIndex = new List<IndexableSet<TypeId>>();
 
 	internal IdAssigner EntityIdAssigner = new IdAssigner();
-	private IdAssigner TypeIdAssigner = new IdAssigner();
 
 	private bool IsDisposed;
 
-	internal TypeId GetTypeId<T>() where T : unmanaged
-	{
-		if (TypeToId.ContainsKey(typeof(T)))
-		{
-			return TypeToId[typeof(T)];
-		}
-
-		var typeId = new TypeId(TypeIdAssigner.Assign());
-		TypeToId.Add(typeof(T), typeId);
-		ElementSizes.Add(typeId, Unsafe.SizeOf<T>());
-
-#if DEBUG
-		IdToType.Add(typeId, typeof(T));
-#endif
-
-		return typeId;
-	}
-
 	internal TypeId GetComponentTypeId<T>() where T : unmanaged
 	{
-		var typeId = GetTypeId<T>();
-		if (ComponentIndex.TryGetValue(typeId, out var componentStorage))
+		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
+		if (typeId < ComponentIndex.Count)
 		{
 			return typeId;
 		}
 
-		componentStorage = new ComponentStorage(typeId, ElementSizes[typeId]);
-		ComponentIndex.Add(typeId, componentStorage);
-		TypeToFilter.Add(typeId, new List<Filter>());
+		// add missing storages, it's possible for there to be multiples in multi-world scenarios
+		for (var i = ComponentIndex.Count; i <= typeId; i += 1)
+		{
+			var missingTypeId = new TypeId((uint) i);
+			var componentStorage = new ComponentStorage(missingTypeId, ComponentTypeElementSizes[i]);
+			ComponentIndex.Add(componentStorage);
+			ComponentTypeToFilter.Add(new List<Filter>());
+		}
+
 		return typeId;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private ComponentStorage GetComponentStorage<T>() where T : unmanaged
 	{
-		var typeId = GetTypeId<T>();
-		if (ComponentIndex.TryGetValue(typeId, out var componentStorage))
-		{
-			return componentStorage;
-		}
-
-		componentStorage = new ComponentStorage(typeId, ElementSizes[typeId]);
-		ComponentIndex.Add(typeId, componentStorage);
-		TypeToFilter.Add(typeId, new List<Filter>());
-		return componentStorage;
+		var typeId = GetComponentTypeId<T>();
+		return ComponentIndex[typeId];
 	}
 
 	// FILTERS
@@ -98,12 +77,12 @@ public class World : IDisposable
 
 			foreach (var typeId in signature.Included)
 			{
-				TypeToFilter[typeId].Add(filter);
+				ComponentTypeToFilter[(int) typeId.Value].Add(filter);
 			}
 
 			foreach (var typeId in signature.Excluded)
 			{
-				TypeToFilter[typeId].Add(filter);
+				ComponentTypeToFilter[(int) typeId.Value].Add(filter);
 			}
 
 			FilterIndex.Add(signature, filter);
@@ -118,50 +97,52 @@ public class World : IDisposable
 	{
 		var entity = new Entity(EntityIdAssigner.Assign());
 
-		if (!EntityComponentIndex.ContainsKey(entity))
+		if (entity.ID == EntityComponentIndex.Count)
 		{
-			EntityRelationIndex.Add(entity, new IndexableSet<TypeId>());
-			EntityComponentIndex.Add(entity, new IndexableSet<TypeId>());
+			EntityRelationIndex.Add(new IndexableSet<TypeId>());
+			EntityComponentIndex.Add(new IndexableSet<TypeId>());
+			EntityTags.Add(tag);
 		}
-
-		EntityTags[entity] = tag;
 
 		return entity;
 	}
 
 	public void Tag(Entity entity, string tag)
 	{
-		EntityTags[entity] = tag;
+		EntityTags[(int) entity.ID] = tag;
 	}
 
 	public string GetTag(Entity entity)
 	{
-		return EntityTags[entity];
+		return EntityTags[(int) entity.ID];
 	}
 
 	public void Destroy(in Entity entity)
 	{
+		var componentSet = EntityComponentIndex[(int) entity.ID];
+		var relationSet = EntityRelationIndex[(int) entity.ID];
+
 		// remove all components from storages
-		foreach (var componentTypeIndex in EntityComponentIndex[entity])
+		foreach (var componentTypeIndex in componentSet)
 		{
 			var componentStorage = ComponentIndex[componentTypeIndex];
 			componentStorage.Remove(entity);
 
-			foreach (var filter in TypeToFilter[componentTypeIndex])
+			foreach (var filter in ComponentTypeToFilter[componentTypeIndex])
 			{
 				filter.RemoveEntity(entity);
 			}
 		}
 
 		// remove all relations from storage
-		foreach (var relationTypeIndex in EntityRelationIndex[entity])
+		foreach (var relationTypeIndex in relationSet)
 		{
 			var relationStorage = RelationIndex[relationTypeIndex];
 			relationStorage.RemoveEntity(entity);
 		}
 
-		EntityComponentIndex[entity].Clear();
-		EntityRelationIndex[entity].Clear();
+		componentSet.Clear();
+		relationSet.Clear();
 
 		// recycle ID
 		EntityIdAssigner.Unassign(entity.ID);
@@ -177,7 +158,7 @@ public class World : IDisposable
 
 	internal bool Has(in Entity entity, in TypeId typeId)
 	{
-		return EntityComponentIndex[entity].Contains(typeId);
+		return EntityComponentIndex[(int) entity.ID].Contains(typeId);
 	}
 
 	public bool Some<T>() where T : unmanaged
@@ -210,9 +191,9 @@ public class World : IDisposable
 
 		if (!componentStorage.Set(entity, component))
 		{
-			EntityComponentIndex[entity].Add(componentStorage.TypeId);
+			EntityComponentIndex[(int) entity.ID].Add(componentStorage.TypeId);
 
-			foreach (var filter in TypeToFilter[componentStorage.TypeId])
+			foreach (var filter in ComponentTypeToFilter[componentStorage.TypeId])
 			{
 				filter.Check(entity);
 			}
@@ -225,9 +206,9 @@ public class World : IDisposable
 
 		if (componentStorage.Remove(entity))
 		{
-			EntityComponentIndex[entity].Remove(componentStorage.TypeId);
+			EntityComponentIndex[(int) entity.ID].Remove(componentStorage.TypeId);
 
-			foreach (var filter in TypeToFilter[componentStorage.TypeId])
+			foreach (var filter in ComponentTypeToFilter[componentStorage.TypeId])
 			{
 				filter.Check(entity);
 			}
@@ -236,31 +217,29 @@ public class World : IDisposable
 
 	// RELATIONS
 
-	private RelationStorage RegisterRelationType(TypeId typeId)
-	{
-		var relationStorage = new RelationStorage(ElementSizes[typeId]);
-		RelationIndex.Add(typeId, relationStorage);
-		return relationStorage;
-	}
-
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private RelationStorage GetRelationStorage<T>() where T : unmanaged
 	{
-		var typeId = GetTypeId<T>();
-		if (RelationIndex.TryGetValue(typeId, out var relationStorage))
+		var typeId = new TypeId(RelationTypeIdAssigner<T>.Id);
+		if (typeId.Value < RelationIndex.Count)
 		{
-			return relationStorage;
+			return RelationIndex[typeId];
 		}
 
-		return RegisterRelationType(typeId);
+		for (var i = RelationIndex.Count; i <= typeId; i += 1)
+		{
+			RelationIndex.Add(new RelationStorage(RelationTypeElementSizes[i]));
+		}
+
+		return RelationIndex[typeId];
 	}
 
 	public void Relate<T>(in Entity entityA, in Entity entityB, in T relation) where T : unmanaged
 	{
 		var relationStorage = GetRelationStorage<T>();
 		relationStorage.Set(entityA, entityB, relation);
-		EntityRelationIndex[entityA].Add(TypeToId[typeof(T)]);
-		EntityRelationIndex[entityB].Add(TypeToId[typeof(T)]);
+		EntityRelationIndex[(int) entityA.ID].Add(new TypeId(RelationTypeIdAssigner<T>.Id));
+		EntityRelationIndex[(int) entityB.ID].Add(new TypeId(RelationTypeIdAssigner<T>.Id));
 	}
 
 	public void Unrelate<T>(in Entity entityA, in Entity entityB) where T : unmanaged
@@ -355,52 +334,52 @@ public class World : IDisposable
 
 	// MESSAGES
 
-	private TypeId GetMessageTypeId<T>() where T : unmanaged
+	private MessageStorage GetMessageStorage<T>() where T : unmanaged
 	{
-		var typeId = GetTypeId<T>();
+		var typeId = new TypeId(MessageTypeIdAssigner<T>.Id);
 
-		if (!MessageIndex.ContainsKey(typeId))
+		if (typeId < MessageIndex.Count)
 		{
-			MessageIndex.Add(typeId, new MessageStorage(Unsafe.SizeOf<T>()));
+			return MessageIndex[typeId];
 		}
 
-		return typeId;
+		for (var i = MessageIndex.Count; i <= typeId; i += 1)
+		{
+			MessageIndex.Add(new MessageStorage(MessageTypeElementSizes[i]));
+		}
+
+		return MessageIndex[typeId];
 	}
 
 	public void Send<T>(in T message) where T : unmanaged
 	{
-		var typeId = GetMessageTypeId<T>();
-		MessageIndex[typeId].Add(message);
+		GetMessageStorage<T>().Add(message);
 	}
 
 	public bool SomeMessage<T>() where T : unmanaged
 	{
-		var typeId = GetMessageTypeId<T>();
-		return MessageIndex[typeId].Some();
+		return GetMessageStorage<T>().Some();
 	}
 
 	public ReadOnlySpan<T> ReadMessages<T>() where T : unmanaged
 	{
-		var typeId = GetMessageTypeId<T>();
-		return MessageIndex[typeId].All<T>();
+		return GetMessageStorage<T>().All<T>();
 	}
 
 	public T ReadMessage<T>() where T : unmanaged
 	{
-		var typeId = GetMessageTypeId<T>();
-		return MessageIndex[typeId].First<T>();
+		return GetMessageStorage<T>().First<T>();
 	}
 
 	public void ClearMessages<T>() where T : unmanaged
 	{
-		var typeId = GetMessageTypeId<T>();
-		MessageIndex[typeId].Clear();
+		GetMessageStorage<T>().Clear();
 	}
 
 	// TODO: temporary component storage?
 	public void FinishUpdate()
 	{
-		foreach (var (_, messageStorage) in MessageIndex)
+		foreach (var messageStorage in MessageIndex)
 		{
 			messageStorage.Clear();
 		}
@@ -412,18 +391,18 @@ public class World : IDisposable
 #if DEBUG
 	public ComponentTypeEnumerator Debug_GetAllComponentTypes(Entity entity)
 	{
-		return new ComponentTypeEnumerator(this, EntityComponentIndex[entity]);
+		return new ComponentTypeEnumerator(this, EntityComponentIndex[(int) entity.ID]);
 	}
 
 	public IEnumerable<Entity> Debug_GetEntities(Type componentType)
 	{
-		var storage = ComponentIndex[TypeToId[componentType]];
+		var storage = ComponentIndex[ComponentTypeToId[componentType]];
 		return storage.Debug_GetEntities();
 	}
 
 	public IEnumerable<Type> Debug_SearchComponentType(string typeString)
 	{
-		foreach (var type in TypeToId.Keys)
+		foreach (var type in ComponentTypeToId.Keys)
 		{
 			if (type.ToString().ToLower().Contains(typeString.ToLower()))
 			{
@@ -456,7 +435,7 @@ public class World : IDisposable
 			return ComponentIndex < Types.Count;
 		}
 
-		public Type Current => World.IdToType[Types[ComponentIndex]];
+		public Type Current => ComponentTypeIdToType[Types[ComponentIndex]];
 	}
 #endif
 
@@ -466,29 +445,29 @@ public class World : IDisposable
 		{
 			if (disposing)
 			{
-				foreach (var componentStorage in ComponentIndex.Values)
+				foreach (var componentStorage in ComponentIndex)
 				{
 					componentStorage.Dispose();
 				}
 
-				foreach (var relationStorage in RelationIndex.Values)
+				foreach (var relationStorage in RelationIndex)
 				{
 					relationStorage.Dispose();
 				}
 
-				foreach (var messageStorage in MessageIndex.Values)
+				foreach (var messageStorage in MessageIndex)
 				{
 					messageStorage.Dispose();
 				}
 
-				foreach (var typeSet in EntityComponentIndex.Values)
+				foreach (var componentSet in EntityComponentIndex)
 				{
-					typeSet.Dispose();
+					componentSet.Dispose();
 				}
 
-				foreach (var typeSet in EntityRelationIndex.Values)
+				foreach (var relationSet in EntityRelationIndex)
 				{
-					typeSet.Dispose();
+					relationSet.Dispose();
 				}
 
 				foreach (var filter in FilterIndex.Values)
@@ -497,7 +476,6 @@ public class World : IDisposable
 				}
 
 				EntityIdAssigner.Dispose();
-				TypeIdAssigner.Dispose();
 			}
 
 			IsDisposed = true;

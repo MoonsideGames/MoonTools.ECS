@@ -16,12 +16,12 @@ public readonly record struct TypeId(uint Value) : IComparable<TypeId>
 	}
 }
 
-public class ComponentTypeIdAssigner
+internal class ComponentTypeIdAssigner
 {
 	protected static ushort Counter;
 }
 
-public class ComponentTypeIdAssigner<T> : ComponentTypeIdAssigner
+internal class ComponentTypeIdAssigner<T> : ComponentTypeIdAssigner
 {
 	public static readonly ushort Id;
 	public static readonly int Size;
@@ -41,12 +41,12 @@ public class ComponentTypeIdAssigner<T> : ComponentTypeIdAssigner
 	}
 }
 
-public class RelationTypeIdAssigner
+internal class RelationTypeIdAssigner
 {
 	protected static ushort Counter;
 }
 
-public class RelationTypeIdAssigner<T> : RelationTypeIdAssigner
+internal class RelationTypeIdAssigner<T> : RelationTypeIdAssigner
 {
 	public static readonly ushort Id;
 	public static readonly int Size;
@@ -61,12 +61,12 @@ public class RelationTypeIdAssigner<T> : RelationTypeIdAssigner
 	}
 }
 
-public class MessageTypeIdAssigner
+internal class MessageTypeIdAssigner
 {
 	protected static ushort Counter;
 }
 
-public class MessageTypeIdAssigner<T> : MessageTypeIdAssigner
+internal class MessageTypeIdAssigner<T> : MessageTypeIdAssigner
 {
 	public static readonly ushort Id;
 	public static readonly int Size;

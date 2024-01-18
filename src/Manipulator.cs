@@ -15,4 +15,6 @@ public abstract class Manipulator : EntityComponentReader
 	protected void Unrelate<TRelationKind>(in Entity entityA, in Entity entityB) where TRelationKind : unmanaged => World.Unrelate<TRelationKind>(entityA, entityB);
 	protected void UnrelateAll<TRelationKind>(in Entity entity) where TRelationKind : unmanaged => World.UnrelateAll<TRelationKind>(entity);
 	protected void Destroy(in Entity entity) => World.Destroy(entity);
+
+	protected void Send<TMessage>(in TMessage message) where TMessage : unmanaged => World.Send(message);
 }

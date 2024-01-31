@@ -39,7 +39,7 @@ public static class RandomManager
 			x = Primes[Random.Next(Primes.Length - 1)];
 		}
 
-		return new LinearCongruentialEnumerator(Random.Next(n), x, n);
+		return new LinearCongruentialEnumerator(Random.Next(n + 1), x, n);
 	}
 }
 
@@ -65,7 +65,7 @@ public struct LinearCongruentialEnumerator
 	public bool MoveNext()
 	{
 		current += 1;
-		if (current < start + count)
+		if (current <= start + count)
 		{
 			return true;
 		}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using MoonTools.ECS.Collections;
@@ -150,6 +150,8 @@ public class World : IDisposable
 
 		// recycle ID
 		EntityIdAssigner.Unassign(entity.ID);
+
+		EntityTags[(int) entity.ID] = "";
 	}
 
 	// COMPONENTS

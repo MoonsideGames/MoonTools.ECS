@@ -1,7 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using MoonTools.ECS.Collections;
+
+#if DEBUG
+using System.Reflection;
+#endif
 
 namespace MoonTools.ECS;
 
@@ -396,8 +400,10 @@ public class World : IDisposable
 
 	public IEnumerable<Entity> Debug_GetEntities(Type componentType)
 	{
-		var storage = ComponentIndex[ComponentTypeToId[componentType]];
-		return storage.Debug_GetEntities();
+		var baseGetComponentStorageMethod = typeof(World).GetMethod(nameof(World.GetComponentStorage), BindingFlags.NonPublic | BindingFlags.Instance)!;
+		var genericGetComponentStorageMethod = baseGetComponentStorageMethod.MakeGenericMethod(componentType);
+		var storage = genericGetComponentStorageMethod.Invoke(this, null) as ComponentStorage;
+		return storage!.Debug_GetEntities();
 	}
 
 	public IEnumerable<Type> Debug_SearchComponentType(string typeString)

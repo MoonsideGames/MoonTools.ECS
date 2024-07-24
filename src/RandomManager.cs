@@ -26,10 +26,14 @@ public static class RandomManager
 	/// </summary>
 	internal static LinearCongruentialEnumerator LinearCongruentialSequence(int n)
 	{
+		// special cases!
 		if (n == 0)
 		{
-			// bail out, empty enumerator
-			return new LinearCongruentialEnumerator(0, 0, 0);
+			return new LinearCongruentialEnumerator(0, 1, 0);
+		}
+		else if (n == 1)
+		{
+			return new LinearCongruentialEnumerator(0, 2, 1);
 		}
 
 		var x = Primes[Random.Next(Primes.Length - 1)];

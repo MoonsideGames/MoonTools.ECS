@@ -107,6 +107,10 @@ public class World : IDisposable
 			EntityComponentIndex.Add(new IndexableSet<TypeId>());
 			EntityTags.Add(tag);
 		}
+		else
+		{
+			EntityTags[(int) entity.ID] = tag;
+		}
 
 		return entity;
 	}

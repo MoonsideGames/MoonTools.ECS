@@ -225,6 +225,20 @@ public class World : IDisposable
 		}
 	}
 
+	internal void CreateStorage<T>() where T : unmanaged
+	{
+		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
+		if (typeId < ComponentIndex.Count)
+		{
+			return;
+		}
+
+		var missingTypeId = new TypeId((uint) ComponentIndex.Count);
+		var componentStorage = new ComponentStorage(missingTypeId, ComponentTypeElementSizes[ComponentIndex.Count]);
+		ComponentIndex.Add(componentStorage);
+		ComponentTypeToFilter.Add(new List<Filter>());
+	}
+
 	// RELATIONS
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

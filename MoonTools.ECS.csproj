@@ -2,8 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="SourceGen\MoonTools.ECS.SourceGen.csproj"></ProjectReference>
+    <Compile Remove="SourceGen/**/*.cs" /> <!-- All .cs files in a directory subtree -->
+  </ItemGroup>
 </Project>

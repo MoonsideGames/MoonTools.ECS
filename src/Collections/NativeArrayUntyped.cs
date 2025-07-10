@@ -13,9 +13,9 @@ internal unsafe class NativeArray : IDisposable
 
 	private bool IsDisposed;
 
-	public NativeArray(int elementSize)
+	public NativeArray(int elementSize, int capacity = 16)
 	{
-		Capacity = 16;
+		Capacity = capacity;
 		Count = 0;
 		ElementSize = elementSize;
 

@@ -20,7 +20,7 @@ public class Random
 	/// </summary>
 	public Random()
 	{
-		Init((uint) Environment.TickCount);
+		Init((uint) DateTime.Now.Ticks);
 	}
 
 	/// <summary>

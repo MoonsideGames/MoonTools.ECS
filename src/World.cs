@@ -225,7 +225,7 @@ public class World : IDisposable
 		}
 	}
 
-	internal void CreateStorage<T>() where T : unmanaged
+	public void CreateStorage<T>() where T : unmanaged
 	{
 		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
 		if (typeId < ComponentIndex.Count)

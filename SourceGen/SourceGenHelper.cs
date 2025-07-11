@@ -6,10 +6,10 @@ namespace SourceGenerator;
 
 public static class SourceGenerationHelper
 {
-    public static string Generate(IEnumerable<string> assemblyNames, IEnumerable<string> nameDeclarations)
+    public static string Generate(IEnumerable<string> namespaceNames, IEnumerable<string> nameDeclarations)
     {
         StringBuilder builder = new StringBuilder();
-		foreach (var name in assemblyNames)
+		foreach (var name in namespaceNames)
 		{
 			builder.AppendLine($"using {name};");
 		}
@@ -19,7 +19,7 @@ public static class SourceGenerationHelper
 
         foreach (var storageType in nameDeclarations)
         {
-            builder.AppendLine($"world.CreateStorage<{storageType}>();");
+            builder.AppendLine($"world.WarmUpComponent<{storageType}>();");
         }
 
 

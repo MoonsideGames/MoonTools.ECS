@@ -16,33 +16,35 @@ public class WarmUpGenerator : IIncrementalGenerator
     {
 		System.Diagnostics.Debugger.Launch();
 
-		var assemblyNames = context.MetadataReferencesProvider.Select(m => m.WithProperties())
-		IncrementalValuesProvider<GenericNameSyntax> invocationProvider = context.SyntaxProvider.CreateSyntaxProvider(
-            predicate: (node, cancelToken) =>
-            {
-                // find all invocations of MoonTools.ECS.World.Set method
-                if (node is InvocationExpressionSyntax invocationExpression)
-                {
-					return invocationExpression.DescendantNodes(n => n == node).OfType<GenericNameSyntax>().Any(g => g.Identifier.ToString() == "Get");
-                }
+		var attributeProvider = context.SyntaxProvider.ForAttributeWithMetadataName(
+			"MoonTools.ECS.Component",
+			predicate: (node, cancelToken) =>
+			{
+				return node is RecordDeclarationSyntax;
+			},
+			transform: (ctx, cancelToken) =>
+			{
+				var target = (BaseTypeDeclarationSyntax) ctx.TargetNode;
+				return (ctx.TargetSymbol.ContainingNamespace.Name, target);
+			}
+		);
 
-                return false;
-            },
-            transform: (ctx, cancelToken) =>
-            {
-                //the transform is called only when the predicate returns true
-                var invocationExpression = (InvocationExpressionSyntax)ctx.Node;
-				return invocationExpression.DescendantNodes(n => n == invocationExpression).OfType<GenericNameSyntax>().First(g => g.Identifier.ToString() == "Get");
-            }
-        );
-
-		var collected = assemblyNames.Combine(invocationProvider.Collect()).Collect();
-        context.RegisterImplementationSourceOutput(collected, (sourceProductionContext, invocationExpression) => Execute(invocationExpression, sourceProductionContext));
+        context.RegisterImplementationSourceOutput(attributeProvider.Collect(), (sourceProductionContext, invocationExpression) => Execute(invocationExpression, sourceProductionContext));
     }
 
-    public void Execute(System.Collections.Immutable.ImmutableArray<(GenericNameSyntax, string)> expressions, SourceProductionContext context)
+    public void Execute(System.Collections.Immutable.ImmutableArray<(string, BaseTypeDeclarationSyntax)> expressions, SourceProductionContext context)
     {
-		var thing = expressions.Select(e => e.Item1.DescendantNodes().OfType<TypeArgumentListSyntax>().First()).Select(t => t.DescendantNodes().OfType<IdentifierNameSyntax>().First()).Select(i => i.ToString()).Distinct();
-        context.AddSource("WarmUpECSStorage.g.cs", SourceGenerationHelper.Generate(expressions.Select(e => e.Item2).Distinct(), thing));
+		var thign2 = expressions.Select(e => e.Item2.Identifier.ToString());
+        context.AddSource("WarmUpECSStorage.g.cs", SourceGenerationHelper.Generate(expressions.Select(e => e.Item1).Distinct(), thign2));
     }
+
+	private static string? ExtractName(NameSyntax? name)
+	{
+		return name switch
+		{
+			SimpleNameSyntax ins => ins.Identifier.Text,
+			QualifiedNameSyntax qns => qns.Right.Identifier.Text,
+			_ => null
+		};
+	}
 }

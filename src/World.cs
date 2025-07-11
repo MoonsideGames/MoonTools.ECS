@@ -225,18 +225,19 @@ public class World : IDisposable
 		}
 	}
 
-	public void CreateStorage<T>() where T : unmanaged
+	// We pay a JIT performance penalty the first time any generic method is called with a value type.
+	// The source generator can warm up storages to avoid this.
+	public void WarmUpComponent<T>() where T : unmanaged
 	{
-		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
-		if (typeId < ComponentIndex.Count)
+		var entity = CreateEntity();
+		Set(entity, default(T));
+		var t = GetSingleton<T>();
+		var singleton = GetSingletonEntity<T>();
+		if (Some<T>() && Has<T>(entity))
 		{
-			return;
+			Remove<T>(entity);
 		}
-
-		var missingTypeId = new TypeId((uint) ComponentIndex.Count);
-		var componentStorage = new ComponentStorage(missingTypeId, ComponentTypeElementSizes[ComponentIndex.Count]);
-		ComponentIndex.Add(componentStorage);
-		ComponentTypeToFilter.Add(new List<Filter>());
+		Destroy(entity);
 	}
 
 	// RELATIONS

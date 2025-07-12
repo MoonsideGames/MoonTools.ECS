@@ -242,6 +242,30 @@ public class World : IDisposable
 
 	// RELATIONS
 
+	// We pay a JIT performance penalty the first time any generic method is called with a value type.
+	// The source generator can warm up storages to avoid this.
+	public void WarmUpRelation<T>() where T : unmanaged
+	{
+		var entityA = CreateEntity();
+		var entityB = CreateEntity();
+		Relate(entityA, entityB, default(T));
+		GetRelationData<T>(entityA, entityB);
+		Related<T>(entityA, entityB);
+		Relations<T>();
+		OutRelations<T>(entityA);
+		HasOutRelation<T>(entityA);
+		OutRelationSingleton<T>(entityA);
+		OutRelationCount<T>(entityA);
+		NthOutRelation<T>(entityA, 0);
+		InRelations<T>(entityB);
+		HasInRelation<T>(entityB);
+		InRelationCount<T>(entityB);
+		InRelationSingleton<T>(entityB);
+		NthInRelation<T>(entityB, 0);
+		Unrelate<T>(entityA, entityB);
+		UnrelateAll<T>(entityA);
+	}
+
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private RelationStorage GetRelationStorage<T>() where T : unmanaged
 	{

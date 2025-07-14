@@ -8,6 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="SourceGen/**/*.cs" /> <!-- All .cs files in a directory subtree -->
+    <Compile Remove="SourceGen/**/*.cs" />
   </ItemGroup>
 </Project>

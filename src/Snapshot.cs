@@ -268,6 +268,9 @@ public class Snapshot : IDisposable
 		private NativeArray Relations;
 		private NativeArray RelationDatas;
 
+		private Dictionary<Entity, IndexableSet<Entity>> InRelationSets = new Dictionary<Entity, IndexableSet<Entity>>();
+		private Dictionary<Entity, IndexableSet<Entity>> OutRelationSets = new Dictionary<Entity, IndexableSet<Entity>>();
+
 		private bool IsDisposed;
 
 		public RelationSnapshot(int elementSize)
@@ -280,6 +283,38 @@ public class Snapshot : IDisposable
 		{
 			relationStorage.Relations.CopyAllTo(Relations);
 			relationStorage.RelationDatas.CopyAllTo(RelationDatas);
+
+			foreach (var set in InRelationSets.Values)
+			{
+				relationStorage.ReturnHashSetToPool(set);
+			}
+			InRelationSets.Clear();
+
+			foreach (var set in OutRelationSets.Values)
+			{
+				relationStorage.ReturnHashSetToPool(set);
+			}
+			OutRelationSets.Clear();
+
+			foreach (var (entity, set) in relationStorage.InRelationSets)
+			{
+				var newSet = relationStorage.AcquireHashSetFromPool();
+				foreach (var item in set)
+				{
+					newSet.Add(item);
+				}
+				InRelationSets.Add(entity, newSet);
+			}
+
+			foreach (var (entity, set) in relationStorage.OutRelationSets)
+            {
+				var newSet = relationStorage.AcquireHashSetFromPool();
+				foreach (var item in set)
+				{
+					newSet.Add(item);
+				}
+				OutRelationSets.Add(entity, newSet);
+            }
 		}
 
 		public void Restore(RelationStorage relationStorage)
@@ -289,28 +324,30 @@ public class Snapshot : IDisposable
 			Relations.CopyAllTo(relationStorage.Relations);
 			RelationDatas.CopyAllTo(relationStorage.RelationDatas);
 
+			foreach (var (entity, set) in InRelationSets)
+			{
+				var newSet = relationStorage.AcquireHashSetFromPool();
+				foreach (var item in set)
+				{
+					newSet.Add(item);
+				}
+				relationStorage.InRelationSets.Add(entity, newSet);
+			}
+
+			foreach (var (entity, set) in OutRelationSets)
+			{
+				var newSet = relationStorage.AcquireHashSetFromPool();
+				foreach (var item in set)
+				{
+					newSet.Add(item);
+				}
+				relationStorage.OutRelationSets.Add(entity, newSet);
+			}
+
 			for (int index = 0; index < Relations.Count; index += 1)
 			{
 				var relation = Relations.Get<(Entity, Entity)>(index);
 				relationStorage.Indices[relation] = index;
-
-				relationStorage.Indices[relation] = index;
-
-				if (!relationStorage.OutRelationSets.ContainsKey(relation.Item1))
-				{
-					relationStorage.OutRelationSets[relation.Item1] =
-						relationStorage.AcquireHashSetFromPool();
-				}
-
-				relationStorage.OutRelationSets[relation.Item1].Add(relation.Item2);
-
-				if (!relationStorage.InRelationSets.ContainsKey(relation.Item2))
-				{
-					relationStorage.InRelationSets[relation.Item2] =
-						relationStorage.AcquireHashSetFromPool();
-				}
-
-				relationStorage.InRelationSets[relation.Item2].Add(relation.Item1);
 			}
 		}
 

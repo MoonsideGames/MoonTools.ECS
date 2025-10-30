@@ -224,7 +224,7 @@ internal class RelationStorage
 		return ListPool.Pop();
 	}
 
-	private void ReturnHashSetToPool(IndexableSet<Entity> hashSet)
+	internal void ReturnHashSetToPool(IndexableSet<Entity> hashSet)
 	{
 		hashSet.Clear();
 		ListPool.Push(hashSet);

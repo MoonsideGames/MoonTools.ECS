@@ -56,6 +56,21 @@ public unsafe class NativeArray<T> : IDisposable where T : unmanaged
 		return false;
 	}
 
+	public void Remove(T element)
+    {
+        for (var i = 0; i < Count; i += 1)
+        {
+            if (Elements[i].Equals(element))
+            {
+				for (var j = i; j < Count - 1; j += 1)
+				{
+					Elements[j] = Elements[j + 1];
+				}
+				Count -= 1;
+            }
+        }
+    }
+
 	public void Clear()
 	{
 		Count = 0;

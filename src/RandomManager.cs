@@ -37,7 +37,7 @@ public static class RandomManager
 		}
 
 		var x = Primes[Random.Next(Primes.Length - 1)];
-		while (x % n == 0)
+		while (x % n == 0 || n % x == 0)
 		{
 			// not coprime, try again
 			x = Primes[Random.Next(Primes.Length - 1)];

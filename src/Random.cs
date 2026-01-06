@@ -11,7 +11,7 @@ public class Random
 {
 	public const int STATE_BYTE_COUNT = 68; // 16 state ints + 1 index int
 
-	uint[] State = new uint[16];
+	readonly uint[] State = new uint[16];
 	uint Index = 0;
 	uint Seed;
 
@@ -122,9 +122,9 @@ public class Random
 		c = State[(Index+13)&15];
 		b = a^c^(a<<16)^(c<<15);
 		c = State[(Index+9)&15];
-		c ^= (c>>11);
+		c ^= c>>11;
 		a = State[Index] = b^c;
-		d = (uint) (a ^((a<<5)&0xDA442D24UL));
+		d = a ^((a<<5)&0xDA442D24);
 		Index = (Index + 15)&15;
 		a = State[Index];
 		State[Index] = a^b^d^(a<<2)^(b<<18)^(c<<28);

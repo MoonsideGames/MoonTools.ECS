@@ -41,6 +41,7 @@ public class World : IDisposable
 	internal List<IndexableSet<TypeId>> EntityComponentIndex = new List<IndexableSet<TypeId>>();
 
 	internal IdAssigner EntityIdAssigner = new IdAssigner();
+	private HashSet<uint> FreedEntityIDs = [];
 
 	private bool IsDisposed;
 
@@ -127,6 +128,11 @@ public class World : IDisposable
 
 	public void Destroy(in Entity entity)
 	{
+		if (FreedEntityIDs.Contains(entity.ID))
+		{
+			return;
+		}
+
 		var componentSet = EntityComponentIndex[(int) entity.ID];
 		var relationSet = EntityRelationIndex[(int) entity.ID];
 
@@ -152,10 +158,10 @@ public class World : IDisposable
 		componentSet.Clear();
 		relationSet.Clear();
 
-		// recycle ID
-		EntityIdAssigner.Unassign(entity.ID);
-
 		EntityTags[(int) entity.ID] = "";
+
+		// recycle ID at end of frame
+		FreedEntityIDs.Add(entity.ID);
 	}
 
 	// COMPONENTS
@@ -393,6 +399,13 @@ public class World : IDisposable
 		{
 			messageStorage.Clear();
 		}
+
+		foreach (var id in FreedEntityIDs)
+		{
+			EntityIdAssigner.Unassign(id);
+		}
+
+		FreedEntityIDs.Clear();
 	}
 
 	// DEBUG

@@ -21,8 +21,8 @@ public class Filter
 	public Entity NthEntity(int index) => EntitySet[index];
 
 	// WARNING: this WILL crash if the filter is empty!
-	public Entity RandomEntity => EntitySet[RandomManager.Next(EntitySet.Count)];
-	public RandomEntityEnumerator EntitiesInRandomOrder => new RandomEntityEnumerator(this);
+	public Entity RandomEntity(Random random) => EntitySet[random.Next(EntitySet.Count)];
+	public RandomEntityEnumerator EntitiesInRandomOrder(Random random) => new RandomEntityEnumerator(random, this);
 
 	internal Filter(World world, FilterSignature signature)
 	{
@@ -83,11 +83,11 @@ public class Filter
 
 		public RandomEntityEnumerator GetEnumerator() => this;
 
-		internal RandomEntityEnumerator(Filter filter)
+		internal RandomEntityEnumerator(Random random, Filter filter)
 		{
 			Filter = filter;
 			LinearCongruentialEnumerator =
-				RandomManager.LinearCongruentialSequence(filter.Count);
+				LinearCongruential.Sequence(random, filter.Count);
 		}
 
 		public bool MoveNext() => LinearCongruentialEnumerator.MoveNext();

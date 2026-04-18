@@ -183,6 +183,12 @@ public class World : IDisposable
 		return storage.Any();
 	}
 
+	public int Count<T>() where T : unmanaged
+	{
+		var storage = GetComponentStorage<T>();
+		return storage.Count;
+	}
+
 	public ref T Get<T>(in Entity entity) where T : unmanaged
 	{
 		var storage = GetComponentStorage<T>();

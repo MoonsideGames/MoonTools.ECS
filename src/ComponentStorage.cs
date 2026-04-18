@@ -14,6 +14,8 @@ internal class ComponentStorage : IDisposable
 
 	private bool IsDisposed;
 
+	public int Count => Components.Count;
+
 	public ComponentStorage(TypeId typeId, int elementSize)
 	{
 		ElementSize = elementSize;

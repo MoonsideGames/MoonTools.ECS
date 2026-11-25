@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Text;
 using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS;
@@ -130,7 +131,7 @@ public class Snapshot : IDisposable
 		// copy components
 		for (var i = ComponentSnapshots.Count; i < world.ComponentIndex.Count; i += 1)
 		{
-			ComponentSnapshots.Add(new ComponentSnapshot(world.ComponentIndex[i].ElementSize));
+			ComponentSnapshots.Add(new ComponentSnapshot(world.ComponentIndex[i].ElementSize, world.ComponentIndex[i].PrintFunction));
 		}
 
 		for (var i = 0; i < world.ComponentIndex.Count; i += 1)
@@ -193,6 +194,35 @@ public class Snapshot : IDisposable
 		}
 	}
 
+	public string Dump()
+	{
+		var str = new StringBuilder();
+
+		foreach (var (signature, entityList) in Filters)
+		{
+			str.AppendLine("Filter: ");
+			foreach (var componentId in signature.Included)
+			{
+				str.AppendLine(World.ComponentTypeIdToType[componentId].Name);
+			}
+			str.AppendLine();
+
+			foreach (var entity in entityList)
+			{
+				str.AppendLine("Entity: " + EntityTags[(int)entity.ID]);
+				foreach (var componentId in EntityComponentIndex[(int)entity.ID])
+				{
+					str.AppendLine(ComponentSnapshots[componentId].Print((int)entity.ID));
+				}
+				str.AppendLine();
+			}
+		}
+
+		// TODO: relations
+
+		return str.ToString();
+	}
+
 	private void TakeFilterSnapshot(Filter filter)
 	{
 		if (!Filters.TryGetValue(filter.Signature, out var entities))
@@ -213,13 +243,15 @@ public class Snapshot : IDisposable
 	{
 		private readonly NativeArray Components;
 		private readonly NativeArray<Entity> EntityIDs;
+		private readonly Func<nint, string> PrintFunction;
 
 		private bool IsDisposed;
 
-		public ComponentSnapshot(int elementSize)
+		public ComponentSnapshot(int elementSize, Func<nint, string> printFunction)
 		{
 			Components = new NativeArray(elementSize);
 			EntityIDs = new NativeArray<Entity>();
+			PrintFunction = printFunction;
 		}
 
 		public void Take(ComponentStorage componentStorage)
@@ -239,6 +271,12 @@ public class Snapshot : IDisposable
 				var entityID = EntityIDs[i];
 				componentStorage.EntityIDToStorageIndex[entityID] = i;
 			}
+		}
+
+		public string Print(int entityID)
+		{
+			var ptr = Components.Pointer(entityID);
+			return PrintFunction(ptr);
 		}
 
 		protected virtual void Dispose(bool disposing)

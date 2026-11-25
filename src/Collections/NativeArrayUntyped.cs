@@ -38,6 +38,11 @@ internal unsafe class NativeArray : IDisposable
 		Unsafe.Write((void*) (Elements + ElementSize * i), element);
 	}
 
+	public nint Pointer(int i)
+	{
+		return Elements + ElementSize * i;
+	}
+
 	private void Resize()
 	{
 		Capacity *= 2;

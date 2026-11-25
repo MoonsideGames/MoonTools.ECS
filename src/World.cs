@@ -14,8 +14,9 @@ public class World : IDisposable
 #if DEBUG
 	// TODO: is there a smarter way to do this?
 	internal static Dictionary<Type, TypeId> ComponentTypeToId = new Dictionary<Type, TypeId>();
-	internal static List<Type> ComponentTypeIdToType = new List<Type>();
 #endif
+
+	internal static List<Type> ComponentTypeIdToType = new List<Type>();
 
 	internal static List<int> ComponentTypeElementSizes = new List<int>();
 	internal static List<int> RelationTypeElementSizes = new List<int>();
@@ -45,7 +46,7 @@ public class World : IDisposable
 
 	private bool IsDisposed;
 
-	internal TypeId GetComponentTypeId<T>() where T : unmanaged
+	internal unsafe TypeId GetComponentTypeId<T>() where T : unmanaged
 	{
 		var typeId = new TypeId(ComponentTypeIdAssigner<T>.Id);
 		if (typeId < ComponentIndex.Count)
@@ -57,7 +58,10 @@ public class World : IDisposable
 		for (var i = ComponentIndex.Count; i <= typeId; i += 1)
 		{
 			var missingTypeId = new TypeId((uint) i);
-			var componentStorage = new ComponentStorage(missingTypeId, ComponentTypeElementSizes[i]);
+			var componentStorage = new ComponentStorage(
+				missingTypeId,
+				ComponentTypeElementSizes[i],
+				ptr => Unsafe.Read<T>((void*) ptr).ToString());
 			ComponentIndex.Add(componentStorage);
 			ComponentTypeToFilter.Add(new List<Filter>());
 		}

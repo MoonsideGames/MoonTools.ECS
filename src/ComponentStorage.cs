@@ -11,17 +11,19 @@ internal class ComponentStorage : IDisposable
 	internal readonly NativeArray<Entity> EntityIDs;
 	internal readonly TypeId TypeId;
 	internal readonly int ElementSize;
+	internal readonly Func<nint, string> PrintFunction;
 
 	private bool IsDisposed;
 
 	public int Count => Components.Count;
 
-	public ComponentStorage(TypeId typeId, int elementSize)
+	public ComponentStorage(TypeId typeId, int elementSize, Func<nint, string> printFunction)
 	{
 		ElementSize = elementSize;
 		Components = new NativeArray(elementSize);
 		EntityIDs = new NativeArray<Entity>();
 		TypeId = typeId;
+		PrintFunction = printFunction;
 	}
 
 	public bool Any()

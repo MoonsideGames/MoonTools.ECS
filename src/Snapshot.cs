@@ -198,25 +198,36 @@ public class Snapshot : IDisposable
 	{
 		var str = new StringBuilder();
 
-		foreach (var (signature, entityList) in Filters)
+		for (var entityId = 0; entityId < EntityComponentIndex.Count; entityId += 1)
 		{
-			str.AppendLine("Filter: ");
-			foreach (var componentId in signature.Included)
+			str.AppendLine("Entity: " + EntityTags[entityId]);
+
+			foreach (var componentId in EntityComponentIndex[entityId])
 			{
-				str.AppendLine(World.ComponentTypeIdToType[componentId].Name);
+				str.AppendLine(ComponentSnapshots[componentId].Print(entityId));
 			}
 			str.AppendLine();
-
-			foreach (var entity in entityList)
-			{
-				str.AppendLine("Entity: " + EntityTags[(int)entity.ID]);
-				foreach (var componentId in EntityComponentIndex[(int)entity.ID])
-				{
-					str.AppendLine(ComponentSnapshots[componentId].Print((int)entity.ID));
-				}
-				str.AppendLine();
-			}
 		}
+
+		// foreach (var (signature, entityList) in Filters)
+		// {
+		// 	str.AppendLine("Filter: ");
+		// 	foreach (var componentId in signature.Included)
+		// 	{
+		// 		str.AppendLine(World.ComponentTypeIdToType[componentId].Name);
+		// 	}
+		// 	str.AppendLine();
+
+		// 	foreach (var entity in entityList)
+		// 	{
+		// 		str.AppendLine("Entity: " + EntityTags[(int)entity.ID]);
+		// 		foreach (var componentId in EntityComponentIndex[(int)entity.ID])
+		// 		{
+		// 			str.AppendLine(ComponentSnapshots[componentId].Print((int)entity.ID));
+		// 		}
+		// 		str.AppendLine();
+		// 	}
+		// }
 
 		// TODO: relations
 

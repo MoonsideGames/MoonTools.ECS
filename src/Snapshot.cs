@@ -444,8 +444,6 @@ public class Snapshot : IDisposable
 				{
 					relationSet.Dispose();
 				}
-
-				EntityIdAssigner.Dispose();
 			}
 
 			IsDisposed = true;

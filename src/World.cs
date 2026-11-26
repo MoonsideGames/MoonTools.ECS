@@ -509,6 +509,8 @@ public class World : IDisposable
 				{
 					filter.Dispose();
 				}
+
+				EntityIdAssigner.Dispose();
 			}
 
 			IsDisposed = true;

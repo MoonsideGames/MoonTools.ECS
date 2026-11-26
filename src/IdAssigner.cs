@@ -1,37 +1,62 @@
 using System;
-using System.Collections.Generic;
+using MoonTools.ECS.Collections;
 
 namespace MoonTools.ECS;
 
-internal class IdAssigner
+internal class IdAssigner : IDisposable
 {
 	uint Next;
-	SortedSet<uint> AvailableIds = [];
+	NativeArray<uint> AvailableIds = new NativeArray<uint>();
+
+	private bool IsDisposed;
 
 	public uint Assign()
 	{
-		if (AvailableIds.Count > 0)
+		if (AvailableIds.TryPop(out var id))
 		{
-			var min = AvailableIds.Min;
-			AvailableIds.Remove(min);
-			return min;
+			return id;
 		}
 
-		var id = Next;
+		id = Next;
 		Next += 1;
 		return id;
 	}
 
 	public void Unassign(uint id)
 	{
-		AvailableIds.Add(id);
+		AvailableIds.Append(id);
 	}
 
 	public void CopyTo(IdAssigner other)
 	{
-		// TODO: is this slow?
-		other.AvailableIds.Clear();
-		other.AvailableIds.UnionWith(AvailableIds);
+		AvailableIds.CopyTo(other.AvailableIds);
 		other.Next = Next;
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
+		if (!IsDisposed)
+		{
+			if (disposing)
+			{
+				AvailableIds.Dispose();
+			}
+
+			IsDisposed = true;
+		}
+	}
+
+	// // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+	// ~IdAssigner()
+	// {
+	//     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+	//     Dispose(disposing: false);
+	// }
+
+	public void Dispose()
+	{
+		// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
 	}
 }

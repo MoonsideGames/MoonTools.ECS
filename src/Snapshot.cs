@@ -275,8 +275,16 @@ public class Snapshot : IDisposable
 
 		public string Print(int entityID)
 		{
-			var ptr = Components.Pointer(entityID);
-			return PrintFunction(ptr);
+			// FIXME: this is slowwww
+			for (var i = 0; i < EntityIDs.Count; i += 1)
+			{
+				if (EntityIDs[i].ID == entityID)
+				{
+					var ptr = Components.Pointer(i);
+					return PrintFunction(ptr);
+				}
+			}
+			return "notfound";
 		}
 
 		protected virtual void Dispose(bool disposing)
